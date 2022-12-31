@@ -1,0 +1,450 @@
+/* content */
+#content
+{
+	font-size: 1.2em;
+
+	max-width: 70ch;
+	margin: 0 auto;
+	padding: 1em;
+}
+
+body
+{
+	font-family: Cantarell, sans-serif;
+	font-weight: 400;
+
+	color: #c5c5ce;
+	background-color: #27272c;
+
+	overflow-x: hidden;
+}
+
+p { display: inline; }
+
+b { color: #d367c1; }
+
+em
+{
+	background: #25242a;
+	color: #D55858;
+	border: 1px solid #446;
+	border-radius: 2px;
+
+	font-style: unset;
+	font-family: monospace;
+	display: inline;
+
+
+	padding:  0em .2em 0em .2em;
+}
+
+hr
+{
+	background: linear-gradient(to right, #d367c1 10%, #dedf40 25%, #62cb5c 50%, #00bbcb 75%, #ab79d6 90%);
+	height: 2px;
+	width: 80%;
+	border: 0;
+}
+
+/* header */
+#header {}
+
+h1.title
+{
+	display: block;
+
+	font-size: 4em;
+	color: #ab79d6;
+}
+
+h1.author
+{
+	display: block;
+
+	font-size: 2.4em;
+	color: #ab79d6;
+}
+
+h1.date
+{
+	display: block;
+
+	font-size: 2.4em;
+	color: #ab79d6;
+}
+
+nav a
+{
+	color: #00bbcb;
+	text-decoration: none;
+}
+
+/* sections */
+h1,h2, h3, h4, h5, h6
+{
+	display: inline;
+	color: #d367c1;
+}
+
+h1 { font-size: 2em;   line-height: 1.6em; }
+h2 { font-size: 1.9em; line-height: 1.6em; }
+h3 { font-size: 1.8em; line-height: 1.4em; }
+h4 { font-size: 1.7em; line-height: 1.6em; }
+h5 { font-size: 1.6em; line-height: 1.6em; }
+h6 { font-size: 1.5em; line-height: 1.5em; }
+
+/* toc */
+#toc
+{
+	background: #25242a;
+	padding: 0.1em 0em 0.4em 0em;
+	width: auto;
+	margin: 1em;
+}
+
+.toc-header
+{
+	font-weight: bold;
+	color: #fff;
+	text-align: center;
+}
+
+/* lists */
+ol, ul
+{
+	margin: 0 0 0 1em;
+	padding: 0;
+	list-style: none;
+	display-style: flex;
+	justify-content: space-between;
+}
+
+.bullet
+{
+	user-select: none;
+	color: #ab79d6;
+	padding-right: .5em;
+	float: left;
+}
+
+/* figures */
+.figures
+{
+	max-width: 58ch;
+	margin: auto
+}
+
+.figure
+{
+	padding-top: 1em;
+	max-width: 100%;
+	margin: auto;
+	text-align: center;
+	display: inline-block;
+	vertical-align: top;
+}
+
+.figure p
+{
+	display: inline-block;
+}
+
+.figures img
+{
+	width: 100%;
+}
+
+.figure-ref
+{
+	display: inline;
+}
+
+.figure-ref:hover
+{
+	background: #334;
+}
+
+.figure-ref img
+{
+	display: none;
+	margin: 1.3em 0 0 0;
+}
+
+.figure-ref a:hover + img
+{
+	content: "abc";
+	width: 50%;
+	left: 25%;
+	display: inline-block;
+	position: absolute;
+	
+	box-shadow: 0px 0px 6px 2px rgba(0,0,0,0.75);
+}
+
+/* code */
+pre
+{
+	margin: 0.5em;
+	white-space: pre;
+}
+
+.code
+{
+	display: inline-block;
+	width: 100%
+}
+
+.code-title
+{
+	color: #CCC;
+	background: #333;
+
+	margin-top: 0.2em;
+	padding: 0.2em;
+	padding-left: 0.4em;
+	padding-right: 0.4em;
+	width: auto;
+	text-align: justify;
+}
+
+.code-content
+{
+	color: white;
+	background: #2A2827;
+	border: solid #333 1px;
+
+	max-height: 20em;
+	margin-bottom: 0.2em;
+	width: auto;
+
+	overflow: auto;
+}
+
+/* quote */
+blockquote
+{
+	border-left: solid #008072 0.2em;
+
+	margin: 1em;
+	padding-left: 0.2em;
+	padding-right: 0.4em;
+
+	display: table;
+}
+
+.quote-author
+{
+	margin-left: 0.2em;
+	font-style: italic;
+}
+
+.quote-author:before {content: "— "; }
+
+/* link */
+.link
+{
+	color: #00bbcb;
+	text-decoration: underline;
+}
+
+.section-link
+{
+	color: #0f808b;
+	text-decoration: none;
+	font-weight: 800;
+}
+
+.section-link:hover
+{
+	color: #00bbcb;
+}
+
+/* external refs */
+#references {}
+
+#references a
+{ text-decoration: none; }
+
+#references a.link
+{ text-decoration: underline; }
+
+.external-ref
+{
+	color: #00bbcb;
+	text-decoration: none;
+}
+
+/* presentation */
+.box
+{
+	border: solid 2px black;
+    border-image: linear-gradient(to bottom left, #d367c1 10%, #dedf40 25%, #62cb5c 50%, #00bbcb 75%, #ab79d6 90%) 1;
+	border-radius: 50%;
+
+	text-align: center;
+
+	width: auto;
+	display: table;
+	padding: 0.3em;
+	margin: auto;
+}
+
+.left-line
+{
+	border-left: solid 2px black;
+    border-image: linear-gradient(to bottom, #d367c1 10%, #dedf40 25%, #62cb5c 50%, #00bbcb 75%, #ab79d6 90%) 1;
+	padding-left: 1em;
+	margin-left: .8em;
+}
+
+/* annotation */
+.annotation
+{
+	display: inline;
+	vertical-align: super;
+
+	font-size: 0.8em;
+	color: #0ff08b;
+}
+
+.annotation:hover
+{
+	color: #00dbcb;
+}
+
+.hide
+{
+	display: none;
+	max-width: 45ch;
+}
+
+.annotation:hover + .hide, .hide:hover
+{
+	display: inline-block;
+	position: absolute;
+
+	margin-top: 0em;
+	margin-left: -1em;
+	padding: 0.1em;
+
+	background-color: #242429;
+	box-shadow: 2px 3px 3px 0px rgba(0,0,0,0.75);
+}
+
+
+/* image slider */
+.comparison-slider
+{
+	height: 50vh;
+	overflow: hidden;
+	-webkit-overflow-scrolling: touch;
+	position: relative;
+	width: 100%
+}
+
+.comparison-slider .comparison-after, .comparison-slider .comparison-before
+{
+	height: 100%;
+	left: 0;
+	margin: 0;
+	overflow: hidden;
+	position: absolute;
+	top: 0;
+}
+
+.comparison-slider .comparison-after img, .comparison-slider .comparison-before img
+{
+	height: 100%;
+	object-fit: cover;
+	object-position: left center;
+	position: absolute;
+	width: 100%
+}
+
+.comparison-slider .comparison-before
+{
+	width: 100%;
+	z-index: 0;
+}
+
+.comparison-slider .comparison-before .comparison-label
+{
+	right: .8rem;
+}
+
+.comparison-slider .comparison-after
+{
+	max-width: 100%;
+	min-width: 0;
+	z-index: 2;
+}
+
+.comparison-slider .comparison-after::before
+{
+	background: 0 0;
+	content: "";
+	cursor: default;
+	height: 100%;
+	left: 0;
+	position: absolute;
+	right: .8rem;
+	top: 0;
+	z-index: 1;
+}
+.comparison-slider .comparison-after::after
+{
+	background: currentColor;
+	border-radius: 50%;
+	box-shadow: 0 -5px, 0 5px;
+	color: #fff;
+	content: "";
+	height: 3px;
+	pointer-events: none;
+	position: absolute;
+	right: .4rem;
+	top: 50%;
+	transform: translate(50%, -50%);
+	width: 3px;
+}
+
+.comparison-slider .comparison-after .comparison-label
+{
+	left: .8rem;
+}
+
+.comparison-slider .comparison-resizer
+{
+	animation: first-run 1.5s 1 ease-in-out;
+	cursor: ew-resize;
+	height: .8rem;
+	left: 0;
+	max-width: 100%;
+	min-width: .8rem;
+	opacity: 0;
+	outline: 0;
+	position: relative;
+	resize: horizontal;
+	top: 50%;
+	transform: translateY(-50%) scaleY(30);
+	width: 0;
+}
+
+.comparison-slider .comparison-label
+{
+	background: rgba(48, 55, 66, .5);
+	bottom: .8rem;
+	color: #fff;
+	padding: .2rem .4rem;
+	position: absolute;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+/* hide/show */
+summary
+{
+	color: #ccf;
+	border-bottom: 2px dashed;
+}

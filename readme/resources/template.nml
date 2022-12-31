@@ -1,0 +1,39 @@
+#+CSS' style.css
+#+CodeStyle' nml.style
+#+SectionLinkPos before
+#+SectionLink #
+%%
+(define (make-article title date tags)
+	(begin
+		(nml-var-define "PageTitle" (string-append title " | Blog"))
+		(string-append
+			"[[{{\n<h2>" title "</h2>\n}}\n"
+			"===\n"
+			"[Home](../index.html)\n"
+			"===\n]]"
+		)))
+
+(define (make-before-after before after before-label after-label)
+	(string-append "{{"
+		"<div class=\"comparison-slider\">\n"
+			"<figure class=\"comparison-before\">\n"
+				"<img src=\"" (nml-html-format before) "\">\n"
+				"<div class=\"comparison-label\">" (nml-html-format before-label) "</div>\n"
+			"</figure>\n"
+			"<figure class=\"comparison-after\">\n"
+				"<img src=\"" (nml-html-format after) "\">\n"
+				"<div class=\"comparison-label\">" (nml-html-format after-label) "</div>\n"
+				"<textarea class=\"comparison-resizer\" readonly></textarea>\n"
+			"</figure>\n"
+		"</div>\n"
+		"}}")
+)%%
+
+#+TexPreamble \
+\usepackage[utf8x]{inputenc}\\
+\usepackage[T1]{fontenc}\\
+\usepackage{amsmath, amssymb, amsfonts, mathrsfs, xcolor, tikz, pgfplots}\\
+\usepgfplotslibrary{patchplots}\\
+\definecolor{__color1}{HTML}{c5c5ce}
+#+TexPrepend \color{__color1}
+

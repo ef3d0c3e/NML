@@ -1358,6 +1358,30 @@ DEFTYPE(Figure, FIGURE,
 /**
  * @brief Represents a code fragment
  */
+
+using code_fragment = std::pair<std::size_t, std::string>;
+
+} // Syntax
+template<>
+struct Lisp::TypeConverter<Syntax::code_fragment>
+{
+	[[nodiscard]] static Syntax::code_fragment to(SCM v)
+	{
+		return Syntax::code_fragment{
+			TypeConverter<std::size_t>::to(scm_list_ref(v, TypeConverter<std::size_t>::from(0))),
+			TypeConverter<std::string>::to(scm_list_ref(v, TypeConverter<std::size_t>::from(1)))
+		};
+	}
+	[[nodiscard]] static SCM from(const Syntax::code_fragment& code)
+	{
+		return scm_list_2(
+			TypeConverter<std::size_t>::from(code.first),
+			TypeConverter<std::string>::from(code.second)
+		);
+	}
+};
+
+namespace Syntax {
 struct Code : public Element
 {
 	/**
@@ -1368,14 +1392,14 @@ struct Code : public Element
 	 * @param _content Fragment's content
 	 * @param _style_file File containing custom style for code fragment
 	 */
-	[[nodiscard]] Code(std::string&& language, std::string&& name, std::string&& content, std::string&& style_file):
-		language(std::move(language)), name(std::move(name)), content(std::move(content)), style_file(std::move(style_file)) {}
+	[[nodiscard]] Code(std::string&& language, std::string&& name, std::string&& style_file, std::vector<code_fragment>&& content):
+		language(std::move(language)), name(std::move(name)), style_file(std::move(style_file)), content(std::move(content)) {}
 
 DEFTYPE(Code, CODE,
 	std::string, language,
 	std::string, name,
-	std::string, content,
-	std::string, style_file)
+	std::string, style_file,
+	std::vector<Syntax::code_fragment>, content)
 
 /**
  * @brief Represents a quote

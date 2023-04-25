@@ -435,7 +435,8 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 					if (!code.name.empty())
 						append(depth+1, fmt::format("<div class=\"code-title\">{}</div>\n", format(code.name)));
 					append(depth+1, "<div class=\"code-content\">\n");
-					html.append(Highlight<HighlightTarget::HTML>(code.content, code.language, code.style_file));
+					// TODO
+					//html.append(Highlight<HighlightTarget::HTML>(code.content, code.language, code.style_file));
 					append(depth+1, "</div>\n");
 					append(depth, "</div>\n");
 					break;

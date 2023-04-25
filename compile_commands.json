@@ -1,0 +1,47 @@
+[
+{
+  "directory": "/home/baraquiel/Programming/nml/build",
+  "command": "/usr/bin/c++  -I/home/baraquiel/Programming/nml/libs/cxxopts -I/home/baraquiel/Programming/nml/libs/fmt/include -isystem /usr/include/guile/3.0 -std=c++2b -Wpedantic -Wall -O2 -pthread -o CMakeFiles/nml.dir/src/HTMLCompiler.cpp.o -c /home/baraquiel/Programming/nml/src/HTMLCompiler.cpp",
+  "file": "/home/baraquiel/Programming/nml/src/HTMLCompiler.cpp"
+},
+{
+  "directory": "/home/baraquiel/Programming/nml/build",
+  "command": "/usr/bin/c++  -I/home/baraquiel/Programming/nml/libs/cxxopts -I/home/baraquiel/Programming/nml/libs/fmt/include -isystem /usr/include/guile/3.0 -std=c++2b -Wpedantic -Wall -O2 -pthread -o CMakeFiles/nml.dir/src/Lisp.cpp.o -c /home/baraquiel/Programming/nml/src/Lisp.cpp",
+  "file": "/home/baraquiel/Programming/nml/src/Lisp.cpp"
+},
+{
+  "directory": "/home/baraquiel/Programming/nml/build",
+  "command": "/usr/bin/c++  -I/home/baraquiel/Programming/nml/libs/cxxopts -I/home/baraquiel/Programming/nml/libs/fmt/include -isystem /usr/include/guile/3.0 -std=c++2b -Wpedantic -Wall -O2 -pthread -o CMakeFiles/nml.dir/src/NML.cpp.o -c /home/baraquiel/Programming/nml/src/NML.cpp",
+  "file": "/home/baraquiel/Programming/nml/src/NML.cpp"
+},
+{
+  "directory": "/home/baraquiel/Programming/nml/build",
+  "command": "/usr/bin/c++  -I/home/baraquiel/Programming/nml/libs/cxxopts -I/home/baraquiel/Programming/nml/libs/fmt/include -isystem /usr/include/guile/3.0 -std=c++2b -Wpedantic -Wall -O2 -pthread -o CMakeFiles/nml.dir/src/Parser.cpp.o -c /home/baraquiel/Programming/nml/src/Parser.cpp",
+  "file": "/home/baraquiel/Programming/nml/src/Parser.cpp"
+},
+{
+  "directory": "/home/baraquiel/Programming/nml/build",
+  "command": "/usr/bin/c++  -I/home/baraquiel/Programming/nml/libs/cxxopts -I/home/baraquiel/Programming/nml/libs/fmt/include -isystem /usr/include/guile/3.0 -std=c++2b -Wpedantic -Wall -O2 -pthread -o CMakeFiles/nml.dir/src/Syntax.cpp.o -c /home/baraquiel/Programming/nml/src/Syntax.cpp",
+  "file": "/home/baraquiel/Programming/nml/src/Syntax.cpp"
+},
+{
+  "directory": "/home/baraquiel/Programming/nml/build",
+  "command": "/usr/bin/c++  -I/home/baraquiel/Programming/nml/libs/cxxopts -I/home/baraquiel/Programming/nml/libs/fmt/include -isystem /usr/include/guile/3.0 -std=c++2b -Wpedantic -Wall -O2 -pthread -o CMakeFiles/nml.dir/src/TextCompiler.cpp.o -c /home/baraquiel/Programming/nml/src/TextCompiler.cpp",
+  "file": "/home/baraquiel/Programming/nml/src/TextCompiler.cpp"
+},
+{
+  "directory": "/home/baraquiel/Programming/nml/build",
+  "command": "/usr/bin/c++  -I/home/baraquiel/Programming/nml/libs/cxxopts -I/home/baraquiel/Programming/nml/libs/fmt/include -isystem /usr/include/guile/3.0 -std=c++2b -Wpedantic -Wall -O2 -pthread -o CMakeFiles/nml.dir/src/Util.cpp.o -c /home/baraquiel/Programming/nml/src/Util.cpp",
+  "file": "/home/baraquiel/Programming/nml/src/Util.cpp"
+},
+{
+  "directory": "/home/baraquiel/Programming/nml/build/libs/fmt",
+  "command": "/usr/bin/c++  -I/home/baraquiel/Programming/nml/libs/fmt/include -std=c++2b -Wpedantic -Wall -O2 -std=gnu++11 -o CMakeFiles/fmt.dir/src/format.cc.o -c /home/baraquiel/Programming/nml/libs/fmt/src/format.cc",
+  "file": "/home/baraquiel/Programming/nml/libs/fmt/src/format.cc"
+},
+{
+  "directory": "/home/baraquiel/Programming/nml/build/libs/fmt",
+  "command": "/usr/bin/c++  -I/home/baraquiel/Programming/nml/libs/fmt/include -std=c++2b -Wpedantic -Wall -O2 -std=gnu++11 -o CMakeFiles/fmt.dir/src/os.cc.o -c /home/baraquiel/Programming/nml/libs/fmt/src/os.cc",
+  "file": "/home/baraquiel/Programming/nml/libs/fmt/src/os.cc"
+}
+]

@@ -1446,46 +1446,47 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 		for (std::size_t pos = 0; pos < code.size();)
 		{
 			const std::string_view left(code.cbegin()+pos, code.cend());
+			const std::size_t left_pos = match_pos + line.size() + 1 + pos;
 
-			const File line_file = File("[include]", left.substr(0, std::min(left.find('\n'), left.size())), 0, 0, f);
-			if (left.starts_with("#:Inc "))
+			if (left.starts_with("#:Inc ")) // Include code from another file
 			{
+				const File line_file = File("[include]", left.substr(0, std::min(left.find('\n'), left.size())), 0, 0, f);
 				if (6 >= line_file.content.size()) [[unlikely]]
-					throw Error(getErrorMessage(f, "Invalid Code", "Missing filename after '#:Inc'", match_pos, line.size()));
+					throw Error(getErrorMessage(f, "Invalid Code", "Missing filename after '#:Inc'", left_pos, line.size()));
 
 				auto&& [filename, filename_end] = line_file.get_token(",", "\\", 6);
 				if (filename.empty())
 					filename = line_file.content.substr(6);
 				if (filename.empty()) [[unlikely]]
-					throw Error(getErrorMessage(f, "Invalid Code", "Empty filename after '#:Inc'", match_pos, line.size()));
+					throw Error(getErrorMessage(f, "Invalid Code", "Empty filename after '#:Inc'", left_pos, line.size()));
 
 				// Parse begin,count
 				if (filename_end != std::string::npos) // e.g '#:Inc filename.ext, 12, 3'
 				{
 					if (filename_end+1 >= line_file.content.size()) [[unlikely]]
-						throw Error(getErrorMessage(f, "Invalid Code", "Missing include line begin after '#:Inc'", match_pos, line.size()));
+						throw Error(getErrorMessage(f, "Invalid Code", "Missing include line begin after '#:Inc'", left_pos, line.size()));
 
 					auto&& [line_begin, line_begin_end] = line_file.get_token(",", "\\", filename_end+1);
 					line_begin = trimIdentifier(line_begin);
 					if (line_begin.empty()) [[unlikely]]
-						throw Error(getErrorMessage(f, "Invalid Code", "Missing include line begin after '#:Inc'", match_pos, line.size()));
+						throw Error(getErrorMessage(f, "Invalid Code", "Missing include line begin after '#:Inc'", left_pos, line.size()));
 
 					if (line_begin_end+1 >= line_file.content.size()) [[unlikely]]
-						throw Error(getErrorMessage(f, "Invalid Code", "Missing include line begin after '#:Inc'", match_pos, line.size()));
+						throw Error(getErrorMessage(f, "Invalid Code", "Missing include line begin after '#:Inc'", left_pos, line.size()));
 					const std::string_view line_count = trimIdentifier(line_file.content.substr(line_begin_end+1));
 					if (line_count.empty()) [[unlikely]]
-						throw Error(getErrorMessage(f, "Invalid Code", "Missing include line count after '#:Inc'", match_pos, line.size()));
+						throw Error(getErrorMessage(f, "Invalid Code", "Missing include line count after '#:Inc'", left_pos, line.size()));
 
 					auto stoi = [&] (const std::string_view& sv, std::size_t& out) {
 						auto [end, err] = std::from_chars(sv.cbegin(), sv.cend(), out);
 						if (err == std::errc{} && end == sv.cend()) [[likely]]
 						{}
 						else if (err == std::errc::invalid_argument) [[unlikely]]
-							throw Error(getErrorMessage(f, "Invalid Code", fmt::format("Cannot parse '{}' as a number", line_begin), match_pos, line.size()));
+							throw Error(getErrorMessage(f, "Invalid Code", fmt::format("Cannot parse '{}' as a number", line_begin), left_pos, line.size()));
 						else if (err == std::errc::result_out_of_range) [[unlikely]]
-							throw Error(getErrorMessage(f, "Invalid Code", fmt::format("Value '{}' cannot be safely represented (out of range)", line_begin), match_pos, line.size()));
+							throw Error(getErrorMessage(f, "Invalid Code", fmt::format("Value '{}' cannot be safely represented (out of range)", line_begin), left_pos, line.size()));
 						else
-							throw Error(getErrorMessage(f, "Invalid Code", fmt::format("Could not parse '{}' as a number", line_begin), match_pos, line.size()));
+							throw Error(getErrorMessage(f, "Invalid Code", fmt::format("Could not parse '{}' as a number", line_begin), left_pos, line.size()));
 					};
 					std::size_t line_begin_n, line_count_n;
 					stoi(line_begin, line_begin_n);
@@ -1494,7 +1495,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 					const std::filesystem::path path(std::filesystem::path(f.name).parent_path().append(filename));
 					std::ifstream in(path);
 					if (!in.good()) [[unlikely]]
-						throw Error(getErrorMessage(f, "Invalid Code", fmt::format("Unable to open file '{}' for '#:Inc'", name), match_pos+6, name.size()));
+						throw Error(getErrorMessage(f, "Invalid Code", fmt::format("Unable to open file '{}' for '#:Inc'", filename), left_pos+6, filename.size()));
 
 					// Erase "#:Inc"
 					code.erase(pos, line_file.content.size());
@@ -1521,14 +1522,14 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 					const std::filesystem::path path(std::filesystem::path(f.name).parent_path().append(filename));
 					std::ifstream in(path);
 					if (!in.good()) [[unlikely]]
-						throw Error(getErrorMessage(f, "Invalid Code", fmt::format("Unable to open file '{}' for '#:Inc'", name), match_pos+6, name.size()));
+						throw Error(getErrorMessage(f, "Invalid Code", fmt::format("Unable to open file '{}' for '#:Inc'", filename), left_pos+6, filename.size()));
 
 					// Erase "#:Inc"
 					code.erase(pos, line_file.content.size());
 
 					std::string content((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
 					if (content.empty()) [[unlikely]]
-						throw Error(getErrorMessage(f, "Invalid Code", fmt::format("Included file '{}' is empty", name), match_pos+6, name.size()));
+						throw Error(getErrorMessage(f, "Invalid Code", fmt::format("Included file '{}' is empty", filename), left_pos+6, filename.size()));
 					content.resize(content.size()-1);
 					code.insert(pos, content);
 					in.close();
@@ -1563,6 +1564,49 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 				++pos;
 		}
 
+		// Determine precise line numbers
+		std::vector<Syntax::code_fragment> frags;
+		std::size_t line_number = 1;
+		const auto add_fragment = [&](const std::string&& code)
+		{
+			frags.push_back({line_number, std::move(code)});
+			line_number += std::count(code.cbegin(), code.cend(), '\n');
+		};
+
+		std::size_t last_pos = 0;
+		const File code_file = File("[code]", code, 0, 0, f);
+		for (std::size_t pos = 0; pos < code.size(); ++pos)
+		{
+			const std::string_view left(code.cbegin()+pos, code.cend());
+
+			if (left.starts_with("#:Line "))
+			{
+				add_fragment(code.substr(last_pos, pos - last_pos - 1));
+
+				const std::string_view line = left.substr(0, std::min(left.find('\n'), left.size()));
+				if (7 >= line.size()) [[unlikely]]
+					throw Error(getErrorMessage(code_file, "Invalid Code", "Missing number after '#:Line'", pos, line.size()));
+
+				const std::string_view line_nr = line.substr(7);
+				if (line_nr.empty()) [[unlikely]]
+					throw Error(getErrorMessage(code_file, "Invalid Code", "Missing number after '#:Line'", pos, line.size()));
+
+				if (const auto&& [ptr, ec] = std::from_chars(line_nr.cbegin(), line_nr.cend(), line_number); ec != std::errc{} || ptr != line_nr.cend()) [[unlikely]]
+					throw Error(getErrorMessage(code_file, "Invalid Code", "Invalid number for '#:Line'", pos, line.size()));
+
+				pos += line.size();
+				last_pos = pos+1;
+			}
+		}
+
+		add_fragment(code.substr(last_pos));
+
+		for (const auto& [line, code] : frags)
+		{
+			std::cout << " - line: " << line << " -\n"
+				<< code << std::endl;
+		}
+
 		// Get CodeStyle
 		std::string code_style;
 		if (Variable* var = doc.var_get("CodeStyle"); var == nullptr) [[unlikely]]
@@ -1570,7 +1614,8 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 		else
 			code_style = var->to_string(doc);
 
-		doc.emplace_back<Syntax::Code>(std::move(language), std::string(name), std::move(code), std::string(code_style));
+		// Replace with new system
+		//doc.emplace_back<Syntax::Code>(std::move(language), std::string(name), std::move(code), std::string(code_style));
 
 		return code_end+3;
 	});

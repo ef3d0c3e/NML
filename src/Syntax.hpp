@@ -9,6 +9,7 @@
 #include <functional>
 #include <memory>
 #include <filesystem>
+#include <algorithm>
 #include "Lisp.hpp"
 #include "Cenum.hpp"
 #include "Util.hpp"
@@ -53,6 +54,12 @@ static std::string getLispStringName(const std::string& prefix, const std::strin
 #define __DEFTYPE_DEF(__N, __name, __tp, __id) __tp __id;
 
 #define DEFTYPE(__name, __enum, ...) \
+	[[nodiscard]] static std::string get_name() {  \
+		constexpr static std::string_view type_name{ #__name }; \
+		std::string lower{type_name}; \
+		std::transform(lower.cbegin(), lower.cend(), lower.begin(), [](unsigned char c){ return std::tolower(c); }); \
+		return lower; \
+	} \
 	[[nodiscard]] Type get_type() const noexcept { return __enum; } \
 	constexpr static Type ELEMENT_TYPE = __enum; \
 private: \
@@ -233,6 +240,33 @@ public:
 	{ return elems.crend(); }
 };
 
+
+template<>
+struct Lisp::TypeConverter<SyntaxTree>
+{
+	using cv = TypeConverter<std::deque<std::shared_ptr<Syntax::Element>>>;
+
+	// TODO: make a copy of every single element
+	[[nodiscard]] static SyntaxTree to(SCM v);
+	[[nodiscard]] static SCM from(const SyntaxTree& tree);
+};
+
+//template<class T>
+//requires (std::is_same_v<T, SyntaxTree>)
+//struct Lisp::TypeConverter<T>
+//{
+//	using cv = TypeConverter<std::deque<std::shared_ptr<Syntax::Element>>>;
+//
+//	[[nodiscard]] static SyntaxTree to(SCM v)
+//	{
+//		return SyntaxTree{};
+//	}
+//	[[nodiscard]] static SCM from(const SyntaxTree& tree)
+//	{
+//		return scm_from_int8(0);
+//	}
+//};
+
 // optional<T>
 template <class T>
 struct Lisp::TypeConverter<std::optional<T>>
@@ -254,23 +288,6 @@ struct Lisp::TypeConverter<std::optional<T>>
 			return SCM_EOL;
 	}
 };
-
-template<>
-struct Lisp::TypeConverter<SyntaxTree>
-{
-	using cv = TypeConverter<std::deque<std::shared_ptr<Syntax::Element>>>;
-
-	// TODO: make a copy of every single element
-	[[nodiscard]] static SyntaxTree to(SCM v)
-	{
-		return *(SyntaxTree*)(nullptr);
-	}
-	[[nodiscard]] static SCM from(const SyntaxTree& tree)
-	{
-		return scm_from_int32(0);
-	}
-};
-
 
 MAKE_CENUM_Q(CType, std::uint8_t,
 	STYLE, 0,
@@ -1214,6 +1231,19 @@ struct OrderedBullet
 using bullet_type = std::variant<Syntax::UnorderedBullet, Syntax::OrderedBullet>;
 
 } // Syntax
+template <>
+struct Lisp::TypeConverter<Syntax::OrderedBullet::Type>
+{
+	[[nodiscard]] static Syntax::OrderedBullet::Type to(SCM v)
+	{
+		return TypeConverter<std::uint8_t>::to(v);
+	}
+	[[nodiscard]] static SCM from(Syntax::OrderedBullet::Type type)
+	{
+		return TypeConverter<std::uint8_t>::from(type);
+	}
+};
+
 template<>
 struct Lisp::TypeConverter<Syntax::bullet_type>
 {

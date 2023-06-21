@@ -7,6 +7,8 @@
 #include <fstream>
 #include <fmt/format.h>
 #include <filesystem>
+#include <ranges>
+#include "LispIntegration.hpp"
 
 struct Lisp::Closure
 {
@@ -28,17 +30,6 @@ void Lisp::init(Document& doc, const File& f, ParserData& data, Parser& parser)
 	Closure* cls = new Closure(doc, f, data);
 	scm_with_guile(::init, cls);
 	scm_c_define("nml-closure", scm_from_pointer(cls, +[](void* p) { std::cout << "called" << std::endl; delete reinterpret_cast<Closure*>(p); }));
-
-	//scm_make_foreign_object_type(
-	//	scm_from_locale_symbol("nml-syntax-section"),
-	//	scm_list_4(
-	//		scm_from_locale_symbol("title"),
-	//		scm_from_locale_symbol("level"),
-	//		scm_from_locale_symbol("numbered"),
-	//		scm_from_locale_symbol("toc")
-	//	),
-	//	NULL
-	//);
 
 	scm_c_define_gsubr("nml-var-defined", 1, 1, 0, (void*)+[](SCM name, SCM sdoc)
 	{
@@ -347,11 +338,13 @@ void Lisp::init(Document& doc, const File& f, ParserData& data, Parser& parser)
 	//}}}
 
 	//{{{ Custom Types
+	// Custom types getters/setters
 	[]<std::size_t... i>(std::index_sequence<i...>)
 	{
 		((TypeConverter<std::tuple_element_t<i, Syntax::Elements>>::init()),...);
 	}(std::make_index_sequence<std::tuple_size_v<Syntax::Elements>>{});
 
+	// Get type's name
 	scm_c_define_gsubr("nmlo-type-name", 1, 0, 0, (void*)+[](SCM elem)
 	{
 		if (scm_list_p(elem) != SCM_BOOL_T)
@@ -360,6 +353,25 @@ void Lisp::init(Document& doc, const File& f, ParserData& data, Parser& parser)
 		SCM type = scm_list_ref(elem, TypeConverter<std::size_t>::from(0));
 		return scm_from_locale_string(Syntax::getTypeName(scm_to_uint8(type)).data());
 	});
+
+	// Custom methods for custom types
+	[]<std::size_t... i>(std::index_sequence<i...>)
+	{
+		(([]
+		{
+			using Type = typename std::tuple_element_t<i, Syntax::Elements>;
+			using Methods = LispMethods<Type>;
+
+			// Methods
+			for (const auto j : std::ranges::iota_view{0uz, Methods::methods.size()})
+			{
+				scm_c_define_gsubr(
+					("nmlo-"s).append(Type::get_name()).append("-").append(Methods::methods[j].name).c_str(),
+					Methods::methods[j].params[0], Methods::methods[j].params[1], Methods::methods[j].params[2],
+					Methods::methods[j].fn);
+			}
+		}()), ...);
+	}(std::make_index_sequence<std::tuple_size_v<Syntax::Elements>>{});
 	//}}}
 }
 

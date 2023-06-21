@@ -40,6 +40,7 @@ void ParserData::emplace_after(const std::string_view& regex, Match&& m)
 	std::size_t line_number = std::count(f.content.cbegin(), f.content.cbegin()+start, '\n'); // Line number
 	std::size_t line_pos = pos - start; // Position in line
 
+
 	return {line_number, line_pos};
 }
 
@@ -1205,7 +1206,6 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 
 		const std::string_view line = f.get_line(match_pos);
 
-		
 		// Get process name
 		if (line.find(' ') == line.size()-1) [[unlikely]]
 			throw Error(getErrorMessage(f, "Invalid DefProcess", "Syntax: '#:DefProcess <Name> <RegexBegin> <RegexEnd>'\nCustom process is missing a name!", match_pos, 17));
@@ -1250,12 +1250,20 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 			if (content.empty()) [[unlikely]]
 				throw Error(getErrorMessage(f, fmt::format("Invalid Custom Process ({})", process->type_name), "Empty content", match_pos, content_end-match_pos+data.current_match_length));
 
-			if (std::string result = process->apply.call(Lisp::TypeConverter<std::string>::from(content)); !result.empty())
-			{
-				result.push_back('\n');
-				Document ins = data.parser.parse(File(fmt::format("[{}-apply result]", process->type_name), result, 0, 0, f), &doc, &data).first;
-				doc.merge(std::move(ins));
-			}
+			// Parse tokens
+			const std::string fcontent = static_cast<std::string>(content).append("\n");
+			Document parsed = data.parser.parse(File(fmt::format("[{}-apply tokens]", process->type_name), fcontent, 0, 0, f), &doc, &data).first;
+			std::deque<Syntax::Element*> elems;
+			parsed.get_tree().for_each_elem([&elems](Syntax::Element* elem) { elems.push_back(elem); });
+
+			// Convert to SCM
+			SCM list = Lisp::TypeConverter<decltype(elems)>::from(elems);
+			
+			auto result = process->apply.call_cv<decltype(elems)>(list);
+			for (Syntax::Element* elem : result) // Add elems to doc
+				doc.push_back(elem);
+
+			// TODO: Find a better way to do this, using a method that also merges non elems (figures, custom types, ...)
 
 			return content_end+process->token_end.size();
 		}));

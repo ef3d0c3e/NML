@@ -1,5 +1,6 @@
 #include "Syntax.hpp"
 #include <utility>
+#include <ranges>
 #include <fmt/format.h>
 
 using namespace std::literals;
@@ -181,4 +182,27 @@ void Syntax::forEveryStyle(Syntax::Style s, std::function<void(Syntax::Style)> f
 [[nodiscard]] std::string ProxyVariable::to_string(const Document& doc) const noexcept
 {
 	return doc.var_get_default(proxy, "error");
+}
+
+[[nodiscard]] SyntaxTree Lisp::TypeConverter<SyntaxTree>::to(SCM v)
+{
+	SyntaxTree tree;
+	const std::size_t len = TypeConverter<std::size_t>::to(scm_length(v));
+	for (const auto i : std::ranges::iota_view{0uz, len})
+		tree.elems.push_back(std::shared_ptr<Syntax::Element>{TypeConverter<Syntax::Element*>::to(scm_list_ref(v, TypeConverter<std::size_t>::from(i)))});
+
+	return tree;
+}
+
+[[nodiscard]] SCM Lisp::TypeConverter<SyntaxTree>::from(const SyntaxTree& tree)
+{
+	if (tree.elems.empty())
+		return SCM_EOL;
+	SCM list = scm_make_list(TypeConverter<std::size_t>::from(tree.elems.size()), SCM_EOL);
+	std::for_each(tree.elems.cbegin(), tree.elems.cend(), [&list, i = 0](const auto& spelem) mutable
+	{
+		scm_list_set_x(list, TypeConverter<std::size_t>::from(i++), TypeConverter<Syntax::Element*>::from(spelem.get()));
+	});
+
+	return list;
 }

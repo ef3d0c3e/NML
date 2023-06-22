@@ -170,7 +170,7 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 		std::string html;
 		auto append = [&](std::size_t depth, const std::string& s)
 		{
-			html.reserve(html.size() + depth);
+			html.reserve(html.size() + depth); // Faster append
 			for (std::size_t i{0}; i < depth; ++i)
 				html.push_back('\t');
 
@@ -269,10 +269,6 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 				}
 				case Syntax::SECTION:
 				{
-					// TODO: Custom guile formatter
-					// (define (section-bullet n i)
-					//	"n: Section depth, i: Section number"
-					//	...)
 					const auto& section = *reinterpret_cast<const Syntax::Section*>(elem);
 					//if (last_type == Syntax::SECTION)
 					append(depth, "<br>\n");
@@ -431,12 +427,66 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 				{
 					const Syntax::Code& code = *reinterpret_cast<const Syntax::Code*>(elem);
 
-					append(depth, "<div class=\"code\">\n");
+					append(depth, "<div class=\"highlight\">\n");
 					if (!code.name.empty())
-						append(depth+1, fmt::format("<div class=\"code-title\">{}</div>\n", format(code.name)));
-					append(depth+1, "<div class=\"code-content\">\n");
-					// TODO
-					//html.append(Highlight<HighlightTarget::HTML>(code.content, code.language, code.style_file));
+						append(depth+1, fmt::format("<div class=\"highlight-title\">{}</div>\n", format(code.name)));
+					append(depth+1, "<div class=\"highlight-content\">\n");
+
+					// List of all lines
+					std::vector<std::pair<std::size_t, std::string>> lines;
+
+					// Build lines vector
+					for (const auto& [start_line, content] : code.content)
+					{
+						// Get formatted string
+						std::string source = Highlight<HighlightTarget::HTML>(content, code.language, code.style_file);
+						// Remove source-highlight comment
+						std::string_view formatted{std::string_view{source}.substr(source.find("-->\n") + 4)};
+
+						
+						for (std::size_t i = 0, start = 0, end = std::min(formatted.find('\n', start), formatted.size()); 
+								start != formatted.size();
+								++i, start = end+1, end = std::min(formatted.find('\n', start), formatted.size()))
+						{
+
+							std::string_view line{formatted.substr(start, end-start)};
+
+							if (i == 0) // '<pre><tt>[content]'
+							{
+								lines.push_back({i+start_line, std::string{line.substr(9)}});
+							}
+							else if (end+1 == formatted.size()) // '[content]</tt></pre>'
+							{
+								if (start+12 != end) // Prevent empty last line
+									lines.push_back({i+start_line, std::string{line.substr(0, line.size()-11)}});
+							}
+							else
+								lines.push_back({i+start_line, std::string{line}});
+						}
+					}
+
+					append(depth+2, "<table>\n");
+					append(depth+3, "<tr>\n");
+
+					// Output lines
+					append(depth+4, "<td class=\"gutter\">\n");
+					append(depth+5, "<pre>");
+					for (const auto& [line, content] : lines)
+						append(0, fmt::format("<span>{}</span><br>", line));
+					append(0, "</pre>\n");
+					append(depth+4, "</td>\n");
+
+					// Output code
+					append(depth+4, "<td class=\"code\">\n");
+					append(depth+5, "<pre>");
+					for (const auto& [line, content] : lines)
+						append(0, fmt::format("<span>{}</span><br>", content));
+					append(0, "</pre>\n");
+					append(depth+4, "</td>\n");
+
+					append(depth+3, "</tr>\n");
+					append(depth+2, "</table>\n");
+
 					append(depth+1, "</div>\n");
 					append(depth, "</div>\n");
 					break;

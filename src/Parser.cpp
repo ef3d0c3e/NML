@@ -1609,12 +1609,6 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 
 		add_fragment(code.substr(last_pos));
 
-		for (const auto& [line, code] : frags)
-		{
-			std::cout << " - line: " << line << " -\n"
-				<< code << std::endl;
-		}
-
 		// Get CodeStyle
 		std::string code_style;
 		if (Variable* var = doc.var_get("CodeStyle"); var == nullptr) [[unlikely]]
@@ -1622,6 +1616,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 		else
 			code_style = var->to_string(doc);
 
+		doc.emplace_back<Syntax::Code>(std::move(language), std::string{name}, std::string{code_style}, std::move(frags));
 		// Replace with new system
 		//doc.emplace_back<Syntax::Code>(std::move(language), std::string(name), std::move(code), std::string(code_style));
 

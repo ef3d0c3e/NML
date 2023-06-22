@@ -795,6 +795,8 @@ Below is a list of important procedures and objects:
  * **(string-ends-with *string* *suffix*)**: Returns whether or not =string= ends with =suffix=
  * **(string-starts-with *string* *prefix*)**: Returns whether or not =string= starts with =prefix=
 
+## Working with nml's objetcts
+
 ## Scheme example
 
 **Compiling a NML document from another NML document**

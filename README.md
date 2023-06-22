@@ -1,6 +1,6 @@
 # NML -- The nice markup language
 
-[Readme](https://ef3d0c3e.github.io/NML/)
+[Readme](https://ef3d0c3e.github.io/NML/readme)
 
 # License
 

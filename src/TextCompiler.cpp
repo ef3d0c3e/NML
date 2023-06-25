@@ -79,7 +79,7 @@ static void append(std::string& s, const Syntax::Element* elem, const std::strin
 					if (lb.ordered)
 					{
 						const auto& ord = std::get<Syntax::OrderedBullet>(lb.bullet);
-						append(s, elem, fmt::format("(ord) st=({}) bullet=({}+{}+{})", lb.style, ord.left, ord.bullet, ord.right), depth+1);
+						append(s, elem, fmt::format("(ord) st=({}) bullet=({}+{}+{})", lb.style, ord.left, ord.bullet.value, ord.right), depth+1);
 					}
 					else
 					{
@@ -130,7 +130,7 @@ static void append(std::string& s, const Syntax::Element* elem, const std::strin
 				case Syntax::REFERENCE:
 				{
 					const Syntax::Reference& ref = *reinterpret_cast<const Syntax::Reference*>(elem);
-					append(s, elem, fmt::format("referencing=({}) name=({}) reftype={}", ref.referencing, ref.name, ref.type), depth+1);
+					append(s, elem, fmt::format("referencing=({}) name=({}) reftype={}", ref.referencing, ref.name, ref.type.value), depth+1);
 					break;
 				}
 				case Syntax::LINK:
@@ -169,7 +169,7 @@ static void append(std::string& s, const Syntax::Element* elem, const std::strin
 				case Syntax::PRESENTATION:
 				{
 					const Syntax::Presentation& pres = *reinterpret_cast<const Syntax::Presentation*>(elem);
-					append(s, elem, fmt::format("{}", pres.type), depth+1);
+					append(s, elem, fmt::format("{}", pres.type.value), depth+1);
 					s.append(generate(pres.content, depth+1));
 					break;
 				}

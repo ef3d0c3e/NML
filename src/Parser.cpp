@@ -394,11 +394,12 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 
 
 [[nodiscard]] ParserData::ParserData(Parser& parser):
-	parser(parser)
+	parser{parser}
 {
 	//{{{ Lists
 	matches.emplace_back("(^|\n)( |\t){1,}(\\*|\\-)"s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos) -> std::size_t
 	{
+		Benchmarker.setName("List");
 		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
 		if (f.content[match_pos] == '\n')
 			++match_pos;
@@ -832,9 +833,10 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	//}}}
 	//{{{ Language
 	// Definition
-	matches.emplace_back("(^|\n)#\\+"s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)
+	matches.emplace_back("(^|\n)#\\+"s, [this](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)
 			-> std::size_t
 	{
+		Benchmarker.setName("Variable definition");
 		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
 		if (f.content[match_pos] == '\n')
 			++match_pos;
@@ -1967,8 +1969,8 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	}
 }
 
-[[nodiscard]] Parser::Parser(const Compiler* const _compiler):
-	compiler(_compiler)
+[[nodiscard]] Parser::Parser(const Compiler* const compiler):
+	compiler{compiler}
 {
 }
 
@@ -2004,19 +2006,24 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	Document doc;
 	if (inherit)
 	{
+		Benchmarker.push("Merge with parent");
 		inherit->var_for_each([&](const std::string& name, const Variable* var)
 		{ doc.vars.insert({name, std::unique_ptr<Variable>(var->clone())}); });
 		doc.figures = inherit->figures;
 		doc.custom_types = inherit->custom_types;
+		Benchmarker.pop(); // Merge with parent
 	}
 	static bool lisp = false;
 	if (!lisp)
 	{
+		Benchmarker.push("Initialize lisp");
 		Lisp::init(doc, f, data, *this);
 		lisp = true;
+		Benchmarker.pop(); // Initialize lisp
 	}
 	for (std::size_t cur_pos = 0; cur_pos < f.content.size();)
 	{
+		Benchmarker.push("Next match");
 		// Next match
 		const std::size_t match_index = std::min_element(data.match_point.cbegin(), data.match_point.cend()) - data.match_point.cbegin();
 		const std::size_t match_pos = data.match_point[match_index];
@@ -2037,6 +2044,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 					throw Error(getErrorMessage(f, "Unterminated Custom Style", std::string(name), f.content.size()-1));
 			});
 
+			Benchmarker.pop(); // Next match
 			break;
 		}
 
@@ -2046,7 +2054,10 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 
 		data.current_match_length = data.match_length[match_index];
 		data.current_match_str = data.match_str[match_index];
+		// TODO: better naming...
+		Benchmarker.push("Parsing match");
 		cur_pos = data.matches[match_index].callback(doc, f, data, cur_pos, match_pos);
+		Benchmarker.pop(); // Parsing match `{}`
 		data.last_match_index = match_index;
 
 		//std::cout << " - " << f.name << '[' << cur_pos << "] -----\n";
@@ -2069,6 +2080,8 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 				data.match_str[i] = "";
 			}
 		}
+
+		Benchmarker.pop(); // Next match
 	}
 
 	closeList(doc, f, data);

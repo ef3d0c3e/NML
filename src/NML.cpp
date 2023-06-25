@@ -5,6 +5,7 @@
 #include "Syntax.hpp"
 #include "Parser.hpp"
 #include "Util.hpp"
+#include "Benchmark.hpp"
 
 #include "TextCompiler.hpp"
 #include "HTMLCompiler.hpp"
@@ -30,6 +31,7 @@ int main(int argc, char* argv[])
 		("o,output", "Sets output file", cxxopts::value<std::string>(out_file))
 		("c,compiler", "Sets compiler", cxxopts::value<std::string>(compiler)->default_value("text"))
 		("p,print", "Prints informations", cxxopts::value<std::vector<std::string>>(printing))
+		("b,benchmark", "Prints benchmark result", cxxopts::value<bool>()->default_value("false"))
 		("no-colors", "Disables colors in messages", cxxopts::value<bool>()->default_value("false"));
 
 	decltype(opts.parse(argc, argv)) result;
@@ -86,6 +88,7 @@ int main(int argc, char* argv[])
 	// Parse
 	try
 	{
+		Benchmarker.push("Reading input");
 		std::ifstream in(in_file_path.filename());
 		if (!in.good())
 		{
@@ -94,8 +97,10 @@ int main(int argc, char* argv[])
 		}
 		std::string content((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
 		in.close();
+		Benchmarker.pop(); // Reading input
 
 
+		Benchmarker.push("Fetching compiler");
 		Compiler* c;
 		if (compiler == "text")
 			c = new TextCompiler();
@@ -115,13 +120,20 @@ int main(int argc, char* argv[])
 			.cxx_enabled = !noCxxDir,
 			.cxx_dir = cxx_dir,
 		};
+		Benchmarker.pop(); // Fetching compiler
 
 
+		Benchmarker.push("Parsing");
 		Parser p(c);
 		auto doc = p.parse(File(in_file_path.filename().string(), content, 0, 0)).first;
+		Benchmarker.pop(); // Parsing
 
 		if (!result.count("output"))
+		{
+			Benchmarker.push("Compiling");
 			std::cout << c->compile(doc, opts);
+			Benchmarker.pop(); // Compiling
+		}
 		else
 		{
 			std::ofstream out(out_file);
@@ -135,6 +147,7 @@ int main(int argc, char* argv[])
 			out.close();
 		}
 
+		Benchmarker.push("Printing");
 		for (const std::string& arg : printing)
 		{
 			if (arg == "vars")
@@ -197,6 +210,7 @@ int main(int argc, char* argv[])
 				std::cerr << "Unknown printing argument : '" << arg << "'." << std::endl;
 			}
 		}
+		Benchmarker.pop(); // Printing
 
 	}
 	catch (Error& e)
@@ -204,6 +218,9 @@ int main(int argc, char* argv[])
 		std::cerr << e.what() << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
+
+	if (result.count("benchmark"))
+		std::cout << Benchmarker.display();
 
 	return EXIT_SUCCESS;
 }

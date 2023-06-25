@@ -7,6 +7,7 @@
 #include <regex>
 
 #include "Syntax.hpp"
+#include "Benchmark.hpp"
 
 class Document;
 class Compiler;
@@ -102,7 +103,7 @@ struct ParserData
 	 */
 	[[nodiscard]] ParserData(Parser& parser);
 
-	Parser& parser;
+	Parser& parser; ///< Parser
 
 	std::vector<Match> matches; ///< List of possible matches
 	std::vector<std::size_t> match_point; ///< Last point at which a regex matched
@@ -143,9 +144,9 @@ public:
 	 * @brief Constructor
 	 * Initializes matches
 	 * 
-	 * @param _compiler Compiler to use
+	 * @param compiler Compiler to use
 	 */
-	[[nodiscard]] Parser(const Compiler* const _compiler);
+	[[nodiscard]] Parser(const Compiler* const compiler);
 
 	/**
 	 * @brief Parse file

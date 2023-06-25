@@ -597,7 +597,7 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 						append(depth, "</div>\n");
 					}
 					else
-						throw Error(fmt::format("Unsupported presentation type : {}", pres.type));
+						throw Error(fmt::format("Unsupported presentation type : {}", pres.type.value));
 					break;
 				}
 				case Syntax::ANNOTATION:

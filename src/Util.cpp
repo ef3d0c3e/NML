@@ -49,7 +49,7 @@ static std::set<std::string> tex_render_cache; // Already rendered files
 		throw Error(fmt::format("Unable to render LaTeX : Path '{}' is not a directory", path));
 
 	const std::filesystem::path dir{path};
-	const std::string filename = tex.filename + ".svg"s;
+	const std::string filename = tex.get<"filename">() + ".svg"s;
 
 	// Populate
 	if (tex_render_cache.empty())
@@ -66,7 +66,7 @@ static std::set<std::string> tex_render_cache; // Already rendered files
 	{
 		std::ifstream in(dir/filename);
 		if (!in.good())
-			throw Error(fmt::format("Could not open svg file `{}` for `{}`", (dir/filename).string(), tex.content));
+			throw Error(fmt::format("Could not open svg file `{}` for `{}`", (dir/filename).string(), tex.get<"content">()));
 		std::string content((std::istreambuf_iterator(in)), (std::istreambuf_iterator<char>()));
 		in.close();
 
@@ -74,7 +74,7 @@ static std::set<std::string> tex_render_cache; // Already rendered files
 	}
 
 
-	fmt::print(" - Processing LaTeX: \"{}\"\n", tex.content);
+	fmt::print(" - Processing LaTeX: \"{}\"\n", tex.get<"content">());
 	{
 		if (std::filesystem::exists("__temp_preamble"))
 			throw Error("`__temp_preamble` already exists");
@@ -82,7 +82,7 @@ static std::set<std::string> tex_render_cache; // Already rendered files
 		if (!out.good())
 			throw Error("Cannot open file `__temp_preamble`");
 
-		out.write(tex.preamble.data(), tex.preamble.size());
+		out.write(tex.get<"preamble">().data(), tex.get<"preamble">().size());
 		out.close();
 	}
 
@@ -93,16 +93,16 @@ static std::set<std::string> tex_render_cache; // Already rendered files
 		if (!out.good())
 			throw Error("Cannot open file `__temp_content`");
 
-		if (tex.mode == Syntax::TexMode::MATH)
-			out << tex.prepend << "$\\displaystyle " << tex.content << "$" << tex.append;
-		else if (tex.mode == Syntax::TexMode::MATH_LINE)
-			out << tex.prepend << "$$" << tex.content << "$$" << tex.append;
-		else if (tex.mode == Syntax::TexMode::NORMAL)
-			out << tex.prepend << tex.content << tex.append;
+		if (tex.get<"mode">() == Syntax::TexMode::MATH)
+			out << tex.get<"prepend">() << "$\\displaystyle " << tex.get<"content">() << "$" << tex.get<"append">();
+		else if (tex.get<"mode">() == Syntax::TexMode::MATH_LINE)
+			out << tex.get<"prepend">() << "$$" << tex.get<"content">() << "$$" << tex.get<"append">();
+		else if (tex.get<"mode">() == Syntax::TexMode::NORMAL)
+			out << tex.get<"prepend">() << tex.get<"content">() << tex.get<"append">();
 		out.close();
 	}
 
-	system(fmt::format("output=$(cat __temp_content | latex2svg --preamble __temp_preamble --fontsize {}) && echo \"$output\" > {}", tex.font_size, (dir/filename).string()).c_str());
+	system(fmt::format("output=$(cat __temp_content | latex2svg --preamble __temp_preamble --fontsize {}) && echo \"$output\" > {}", tex.get<"font_size">(), (dir/filename).string()).c_str());
 
 	{
 		std::error_code ec;
@@ -120,7 +120,7 @@ static std::set<std::string> tex_render_cache; // Already rendered files
 
 	std::ifstream in(dir/filename);
 	if (!in.good())
-		throw Error(fmt::format("Could not open svg file `{}` for `{}`", (dir/filename).string(), tex.content));
+		throw Error(fmt::format("Could not open svg file `{}` for `{}`", (dir/filename).string(), tex.get<"content">()));
 	std::string content((std::istreambuf_iterator(in)), (std::istreambuf_iterator<char>()));
 	in.close();
 

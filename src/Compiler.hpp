@@ -10,8 +10,9 @@ struct CompilerOptions
 {
 	bool tex_enabled; ///< Whether tex processing is enabled or not
 	std::string tex_dir; ///< Location of tex directory
+	bool cache_enabled; ///< Whether caching is enabled
+	std::string cache_dir; ///< Location of cache directory
 	bool cxx_enabled; ///< Whether cxx processing is enabled or not
-	std::string cxx_dir; ///< Location of cxx directory
 };
 
 /**

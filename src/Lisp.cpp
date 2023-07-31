@@ -354,25 +354,27 @@ void Lisp::init(Document& doc, const File& f, ParserData& data, Parser& parser)
 		return scm_from_locale_string(Syntax::getTypeName(scm_to_uint8(type)).data());
 	});
 
+	/*
 	// Custom methods for custom types
 	[]<std::size_t... i>(std::index_sequence<i...>)
 	{
 		(([]
 		{
+			// TODO
 			using Type = typename std::tuple_element_t<i, Syntax::Elements>;
 			using Methods = LispMethods<Type>;
 
 			// Methods
 			for (const auto j : std::ranges::iota_view{0uz, Methods::methods.size()})
 			{
-				scm_c_define_gsubr(
-					("nmlo-"s).append(Type::get_name()).append("-").append(Methods::methods[j].name).c_str(),
-					Methods::methods[j].params[0], Methods::methods[j].params[1], Methods::methods[j].params[2],
-					Methods::methods[j].fn);
+			scm_c_define_gsubr(
+				("nmlo-"s).append(Type::class_name).append("-").append(Methods::methods[j].name).c_str(),
+				Methods::methods[j].params[0], Methods::methods[j].params[1], Methods::methods[j].params[2],
+				Methods::methods[j].fn);
 			}
 		}()), ...);
 	}(std::make_index_sequence<std::tuple_size_v<Syntax::Elements>>{});
-	//}}}
+	*/
 }
 
 void Lisp::eval(const std::string& s, Document& doc, ParserData& data, Parser& parser)

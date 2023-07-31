@@ -10,6 +10,7 @@
 #include <memory>
 #include <filesystem>
 #include <algorithm>
+#include "NMLO.hpp"
 #include "Lisp.hpp"
 #include "Cenum.hpp"
 #include "Util.hpp"
@@ -17,109 +18,6 @@
 using namespace std::literals;
 
 namespace Syntax { struct Element; struct Section; struct Figure; struct ExternalRef; }
-
-// {{{ Lisp helpers
-static std::string getLispStringName(const std::string& prefix, const std::string& name)
-{
-	std::string r = "nmlo-";
-	for (char c : prefix)
-	{
-		if (r.back() != '-' && std::tolower(c) != c)
-			r.push_back('-');
-		r.push_back(static_cast<char>(std::tolower(c)));
-	}
-	r.push_back('-');
-	for (char c : name)
-	{
-		if (r.back() != '-' && std::tolower(c) != c)
-			r.push_back('-');
-		r.push_back(static_cast<char>(std::tolower(c)));
-	}
-	return r;
-}
-
-#define __DEFTYPE_MAP(__counter_base, __name, __m, __first, __second, ...) \
-	__m(__COUNTER__ - __counter_base - 1, __name, __first, __second)     \
-		__CENUM_IF_ELSE(__CENUM_HAS_ARGS(__VA_ARGS__))(                \
-			__CENUM_DEFER2(__DEFTYPE__MAP)()(__counter_base, __name, __m, __VA_ARGS__))()
-#define __DEFTYPE__MAP() __DEFTYPE_MAP
-#define __DEFTYPE_INIT(__N, __name, __tp, __id) \
-	scm_c_define_gsubr(getLispStringName(#__name, #__id).c_str(), 1, 0, 0, (void*)+[](SCM o) \
-	{ return scm_list_ref(o, TypeConverter<std::size_t>::from(__N)); });
-#define __DEFTYPE_TO(__N, __name, __tp, __id) \
-	o.__id = TypeConverter<__tp>::to(scm_list_ref(v, TypeConverter<std::size_t>::from(__N)));
-#define __DEFTYPE_TO_NEW(__N, __name, __tp, __id) \
-	p->__id = TypeConverter<__tp>::to(scm_list_ref(v, TypeConverter<std::size_t>::from(__N)));
-#define __DEFTYPE_FROM(__N, __name, __tp, __id) TypeConverter<__tp>::from(o.__id),
-#define __DEFTYPE_DEF(__N, __name, __tp, __id) __tp __id;
-
-#define DEFTYPE(__name, __enum, ...) \
-	[[nodiscard]] static std::string get_name() {  \
-		constexpr static std::string_view type_name{ #__name }; \
-		std::string lower{type_name}; \
-		std::transform(lower.cbegin(), lower.cend(), lower.begin(), [](unsigned char c){ return std::tolower(c); }); \
-		return lower; \
-	} \
-	[[nodiscard]] Type get_type() const noexcept { return __enum; } \
-	constexpr static Type ELEMENT_TYPE = __enum; \
-private: \
-	enum { __counter2 = __COUNTER__ }; \
-public: \
-	__CENUM_EXPAND(__CENUM_EVAL(__DEFTYPE_MAP(__counter2, __name, __DEFTYPE_DEF, __VA_ARGS__))) \
-	[[nodiscard]] __name() {} \
-}; \
-} \
-template <> \
-struct Lisp::TypeConverter<Syntax::__name> \
-{ \
-private: \
-	enum { __counter1 = __COUNTER__ }; \
-public: \
-	static void init() \
-	{ \
-		__CENUM_EXPAND(__CENUM_EVAL(__DEFTYPE_MAP(__counter1+1, __name, __DEFTYPE_INIT, __VA_ARGS__))) \
-		scm_c_define_gsubr(getLispStringName("is", #__name).c_str(), 1, 0, 0, (void*)+[](SCM o) \
-		{ return scm_from_bool(Syntax::__name::ELEMENT_TYPE == scm_to_uint8(scm_list_ref(o, TypeConverter<std::size_t>::from(0)))); }); \
-	} \
-private: \
-	enum { __counter2 = __COUNTER__ }; \
-public: \
-	[[nodiscard]] static Syntax::__name to(SCM v) \
-	{ \
-		Syntax::__name o; \
-		__CENUM_EXPAND(__CENUM_EVAL(__DEFTYPE_MAP(__counter2+1, __name, __DEFTYPE_TO, __VA_ARGS__))) \
-		return o; \
-	} \
-private: \
-	enum { __counter3 = __COUNTER__ }; \
-public: \
-	[[nodiscard]] static Syntax::__name* to_new(SCM v) \
-	{ \
-		Syntax::__name* p = new Syntax::__name; \
-		__CENUM_EXPAND(__CENUM_EVAL(__DEFTYPE_MAP(__counter3+1, __name, __DEFTYPE_TO_NEW, __VA_ARGS__))) \
-		return p; \
-	} \
-private: \
-	enum { __counter4 = __COUNTER__ }; \
-public: \
-	[[nodiscard]] static SCM from(const Syntax::__name& o) \
-	{ \
-		return scm_list_n( \
-			TypeConverter<std::uint8_t>::from(o.get_type().value), \
-			__CENUM_EXPAND(__CENUM_EVAL(__DEFTYPE_MAP(__counter4+1, __name, __DEFTYPE_FROM, __VA_ARGS__))) \
-			SCM_UNDEFINED); \
-	} \
-}; \
-namespace Syntax {
-
-#define DEFCTYPE(__name, __enum, ...) \
-	[[nodiscard]] CType get_type() const noexcept { return CType::__enum; } \
-private: \
-	enum { __counter1 = __COUNTER__ }; \
-public: \
-	__CENUM_EXPAND(__CENUM_EVAL(__DEFTYPE_MAP(__counter1, __name, __DEFTYPE_DEF, __VA_ARGS__))) \
-};
-// }}}
 
 /**
  * @brief Contains all the syntax elements
@@ -302,7 +200,6 @@ struct CustomType
 
 	[[nodiscard]] virtual CType get_type() const noexcept = 0;
 
-
 	/**
 	 * @brief Move constructor
 	 *
@@ -319,6 +216,14 @@ struct CustomType
  */
 struct CustomStyle : public CustomType
 {
+	std::size_t index;
+	std::string regex;
+	Lisp::Proc begin;
+	Lisp::Proc end;
+	std::optional<Lisp::Proc> apply;
+
+	[[nodiscard]] CType get_type() const noexcept { return CType::STYLE; }
+
 	/**
 	 * @brief Constructor
 	 *
@@ -359,13 +264,7 @@ struct CustomStyle : public CustomType
 	 */
 	[[nodiscard]] CustomStyle() noexcept:
 		CustomType("") {}
-
-DEFCTYPE(CustomStyle, STYLE,
-	std::size_t, index,
-	std::string, regex,
-	Lisp::Proc, begin,
-	Lisp::Proc, end,
-	std::optional<Lisp::Proc>, apply)
+};
 
 template <>
 struct Lisp::TypeConverter<CustomStyle>
@@ -403,6 +302,14 @@ struct Lisp::TypeConverter<CustomStyle>
  */
 struct CustomPres : public CustomType
 {
+	std::size_t index;
+	std::string regex_begin;
+	std::string regex_end;
+	Lisp::Proc begin;
+	Lisp::Proc end;
+
+	[[nodiscard]] CType get_type() const noexcept { return CType::PRES; }
+
 	/**
 	 * @brief Constructor
 	 *
@@ -420,13 +327,7 @@ struct CustomPres : public CustomType
 	 */
 	[[nodiscard]] CustomPres() noexcept:
 		CustomType("") {}
-
-DEFCTYPE(CustomPres, PRES,
-	std::size_t, index,
-	std::string, regex_begin,
-	std::string, regex_end,
-	Lisp::Proc, begin,
-	Lisp::Proc, end)
+};
 
 template <>
 struct Lisp::TypeConverter<CustomPres>
@@ -461,6 +362,13 @@ struct Lisp::TypeConverter<CustomPres>
  */
 struct CustomProcess : public CustomType
 {
+	std::size_t index;
+	std::string regex_begin;
+	std::string token_end;
+	Lisp::Proc apply;
+
+	[[nodiscard]] CType get_type() const noexcept { return CType::PROCESS; }
+
 	/**
 	 * @brief Constructor
 	 *
@@ -477,12 +385,7 @@ struct CustomProcess : public CustomType
 	 */
 	[[nodiscard]] CustomProcess() noexcept:
 		CustomType("") {}
-
-DEFCTYPE(CustomProcess, PROCESS,
-	std::size_t, index,
-	std::string, regex_begin,
-	std::string, token_end,
-	Lisp::Proc, apply)
+};
 
 template <>
 struct Lisp::TypeConverter<CustomProcess>
@@ -666,7 +569,7 @@ public:
 		if constexpr (std::is_same_v<T, Syntax::Figure>)
 		{
 			ptr = new T(std::forward<Args>(args)..., ++figure_id);
-			figures.insert({ptr->name, ptr});
+			figures.insert({ptr->template get<"name">(), ptr});
 		}
 		else if constexpr (std::is_same_v<T, Syntax::ExternalRef>)
 		{
@@ -677,13 +580,13 @@ public:
 		{
 			ptr = new T(std::forward<Args>(args)...);
 
-			while (ptr->level > numbers.size())
+			while (ptr->template get<"level">() > numbers.size())
 				numbers.push(0);
-			while (ptr->level < numbers.size())
+			while (ptr->template get<"level">() < numbers.size())
 				numbers.pop();
 			++numbers.top();
 
-			if (ptr->toc)
+			if (ptr->template get<"toc">())
 				header.emplace_back(numbers.top(), ptr);
 		}
 		else
@@ -975,38 +878,6 @@ public:
 namespace Syntax
 {
 /**
- * @brief Type of syntax elemnts
- */
-MAKE_CENUMV_Q(Type, std::uint8_t,
-	TEXT, 0,
-	STYLEPUSH, 1,
-	STYLEPOP, 2,
-	BREAK, 3,
-	SECTION, 4,
-	LIST_BEGIN, 5,
-	LIST_END, 6,
-	LIST_ENTRY, 7,
-	RULER, 8,
-	FIGURE, 9,
-	CODE, 10,
-	QUOTE, 11,
-	REFERENCE, 12,
-	LINK, 13,
-	LATEX, 14,
-	RAW, 15,
-	RAW_INLINE, 16,
-	EXTERNAL_REF, 17,
-	PRESENTATION, 18,
-	ANNOTATION, 19,
-
-	/* User-Defined */
-	CUSTOM_STYLEPUSH, 20,
-	CUSTOM_STYLEPOP, 21,
-	CUSTOM_PRESPUSH, 22,
-	CUSTOM_PRESPOP, 23,
-);
-
-/**
  * @brief Gets whether type is custom or not
  *
  * @param type Type
@@ -1021,18 +892,6 @@ MAKE_CENUMV_Q(Type, std::uint8_t,
  * @returns Type's name
  */
 [[nodiscard]] std::string_view getTypeName(Type type) noexcept;
-
-
-/**
- * @brief Abstract class for an element
- */
-struct Element
-{
-	[[nodiscard]] virtual Type get_type() const noexcept = 0;
-
-	virtual ~Element() {};
-};
-
 
 /**
  * @brief Styles for text
@@ -1081,7 +940,9 @@ namespace Syntax {
  * @brief Text
  * Text can have style @see Text::Style
  */
-struct Text : public Element
+struct Text : public NMLO<Syntax::TEXT, "Text",
+		NMLOField<std::string, "content">
+	>
 {
 	/**
 	 * @brief Constructor
@@ -1089,8 +950,8 @@ struct Text : public Element
 	 * @param _content Text's content
 	 * @param _style Text's style
 	 */
-	[[nodiscard]] Text(std::string&& content) noexcept:
-		content(std::move(content)) {}
+	[[nodiscard]] Text(std::string&& content) noexcept
+	{ get<"content">() = std::move(content); }
 
 	/**
 	 * @brief String view constructor
@@ -1098,82 +959,87 @@ struct Text : public Element
 	 * @param view View to content
 	 * @param _style Text's style
 	 */
-	[[nodiscard]] Text(const std::string_view& view) noexcept:
-		content(view) {}
+	[[nodiscard]] Text(const std::string_view& view) noexcept
+	{ get<"content">() = view; }
+};
 
-DEFTYPE(Text, TEXT,
-	std::string, content)
 
 /**
  * @brief Single style being added
  */
-struct StylePush : public Element
+struct StylePush : public NMLO<Syntax::STYLEPUSH, "StylePush",
+		NMLOField<Syntax::Style, "style">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _style Added style
+	 * @param style Added style
 	 */
-	[[nodiscard]] StylePush(Style style) noexcept:
-		style(style) {}
-DEFTYPE(StylePush, STYLEPUSH,
-	Syntax::Style, style)
+	[[nodiscard]] StylePush(Style style) noexcept
+	{ get<"style">() = style; }
+};
 
 /**
  * @brief Single style being removed
  */
-struct StylePop : public Element
+struct StylePop : public NMLO<Syntax::STYLEPOP, "StylePop",
+		NMLOField<Syntax::Style, "style">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _style Removec style
+	 * @param style Removed style
 	 */
-	[[nodiscard]] StylePop(Style style) noexcept:
-		style(style) {}
-
-DEFTYPE(StylePop, STYLEPOP,
-	Syntax::Style, style)
+	[[nodiscard]] StylePop(Style style) noexcept
+	{ get<"style">() = style; }
+};
 
 /**
  * @brief Break
  * Represents spacing in the document
  */
-struct Break : public Element
+struct Break : public NMLO<Syntax::BREAK, "Break",
+		NMLOField<std::size_t, "size">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
 	 * @param _size Number of lines for break
 	 */
-	[[nodiscard]] Break(std::size_t size) noexcept:
-		size(size) {}
-
-DEFTYPE(Break, BREAK,
-	std::size_t, size)
+	[[nodiscard]] Break(std::size_t size) noexcept
+	{ get<"size">() = size; }
+};
 
 /**
  * @brief Section
  * Represents section in the document
  */
-struct Section : public Element
+struct Section : public NMLO<Syntax::SECTION, "Section",
+		NMLOField<std::string, "title">,
+		NMLOField<std::size_t, "level">,
+		NMLOField<bool, "numbered">,
+		NMLOField<bool, "toc">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _title Section's title
-	 * @param _level Section's level
-	 * @param _numbered Whether section should have numbering
-	 * @param _tor Whether section sohuld appear in the toc
+	 * @param title Section's title
+	 * @param level Section's level
+	 * @param numbered Whether section should have numbering
+	 * @param tor Whether section sohuld appear in the toc
 	 */
-	[[nodiscard]] Section(std::string&& _title, std::size_t _level, bool _numbered, bool _toc) noexcept:
-		title(std::move(_title)), level(_level), numbered(_numbered), toc(_toc) {}
-
-DEFTYPE(Section, SECTION,
-	std::string, title,
-	std::size_t, level,
-	bool, numbered,
-	bool, toc)
+	[[nodiscard]] Section(std::string&& title, std::size_t level, bool numbered, bool toc) noexcept
+	{
+		get<"title">() = std::move(title);
+		get<"level">() = level;
+		get<"numbered">() = numbered;
+		get<"toc">() = toc;
+	}
+};
 
 // {{{ Bullets
 /**
@@ -1280,115 +1146,125 @@ namespace Syntax {
 /**
  * @brief Beginning of a list
  */
-struct ListBegin : public Element
+struct ListBegin : public NMLO<Syntax::LIST_BEGIN, "ListBegin",
+		NMLOField<std::string, "style">,
+		NMLOField<bool, "ordered">,
+		NMLOField<Syntax::bullet_type, "bullet">
+	>
 {
 	/**
 	 * @brief Unordered list constructor
 	 *
-	 * @param _style Additional style
+	 * @param style Additional style
 	 * @param bullet List's bullet
 	 */
-	[[nodiscard]] ListBegin(std::string&& style, std::string&& _bullet):
-		style(std::move(style)), ordered(false)
+	[[nodiscard]] ListBegin(std::string&& style, std::string&& bullet)
 	{
-		bullet.emplace<UnorderedBullet>(std::move(_bullet));
+		get<"style">() = std::move(style);
+		get<"ordered">() = false;
+		get<"bullet">().emplace<UnorderedBullet>(std::move(bullet));
 	}
 
 	/**
 	 * @brief Ordered list constructor
 	 *
-	 * @param _style Additional style
+	 * @param style Additional style
 	 * @param type List's bullet type
 	 * @param left Lest delimiter
 	 * @param right Right delimiter
 	 */
-	[[nodiscard]] ListBegin(std::string&& style, OrderedBullet::Type type, std::string&& left, std::string&& right):
-		style(std::move(style)), ordered(true)
+	[[nodiscard]] ListBegin(std::string&& style, OrderedBullet::Type type, std::string&& left, std::string&& right)
 	{
-		bullet.emplace<OrderedBullet>(type, std::move(left), std::move(right));
-	}
 
-DEFTYPE(ListBegin, LIST_BEGIN,
-	std::string, style,
-	bool, ordered,
-	Syntax::bullet_type, bullet)
+		get<"style">() = std::move(style);
+		get<"ordered">() = true;
+		get<"bullet">().emplace<OrderedBullet>(type, std::move(left), std::move(right));
+	}
+};
 
 /**
  * @brief End of a list
  */
-struct ListEnd : public Element
+struct ListEnd : public NMLO<Syntax::LIST_END, "ListEnd",
+		NMLOField<bool, "ordered">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
 	 * @param ordered Whether the list was ordered or not
 	 */
-	[[nodiscard]] ListEnd(bool ordered):
-		ordered(ordered) {}
-
-DEFTYPE(ListEnd, LIST_END,
-	bool, ordered)
+	[[nodiscard]] ListEnd(bool ordered)
+	{ get<"ordered">() = ordered; }
+};
 
 /**
  * @brief List entry
  */
-struct ListEntry : public Element
+struct ListEntry : public NMLO<Syntax::LIST_ENTRY, "ListEntry",
+		NMLOField<SyntaxTree, "content">,
+		NMLOField<std::size_t, "counter">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _content Entry's content
-	 * @param _count Entry's counter
+	 * @param content Entry's content
+	 * @param count Entry's counter
 	 */
-	[[nodiscard]] ListEntry(SyntaxTree&& content, std::size_t counter):
-		content(std::move(content)), counter(counter) {}
-
-DEFTYPE(ListEntry, LIST_ENTRY,
-	SyntaxTree, content,
-	std::size_t, counter)
+	[[nodiscard]] ListEntry(SyntaxTree&& content, std::size_t counter)
+	{
+		get<"content">() = std::move(content);
+		get<"counter">() = counter;
+	}
+};
 
 /**
  * @brief A ruler (horizontal separator)
  */
-struct Ruler : public Element
+struct Ruler : public NMLO<Syntax::RULER, "Ruler",
+		NMLOField<std::size_t, "length">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _length Ruler's length
+	 * @param length Ruler's length
 	 */
-	[[nodiscard]] Ruler(std::size_t length):
-		length(length) {}
-
-DEFTYPE(Ruler, RULER,
-	std::size_t, length)
+	[[nodiscard]] Ruler(std::size_t length)
+	{ get<"length">() = length; }
+};
 
 /**
  * @brief A figure
  */
-struct Figure : public Element
+struct Figure : public NMLO<Syntax::FIGURE, "Figure",
+		NMLOField<std::string, "path">,
+		NMLOField<std::string, "name">,
+		NMLOField<SyntaxTree, "description">,
+		NMLOField<std::size_t, "id">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _path Figure's path
-	 * @param _name Figure's name
-	 * @param _description Figure's description
-	 * @param _id Figure's id
+	 * @param path Figure's path
+	 * @param name Figure's name
+	 * @param description Figure's description
+	 * @param id Figure's id
 	 */
-	[[nodiscard]] Figure(std::string&& path, std::string&& name, SyntaxTree&& description, std::size_t id):
-		path(std::move(path)), name(std::move(name)), description(std::move(description)), id(id) {}
-
-DEFTYPE(Figure, FIGURE,
-	std::string, path,
-	std::string, name,
-	SyntaxTree, description,
-	std::size_t, id)
+	[[nodiscard]] Figure(std::string&& path, std::string&& name, SyntaxTree&& description, std::size_t id)
+	{
+		get<"path">() = std::move(path);
+		get<"name">() = std::move(name);
+		get<"description">() = std::move(description);
+		get<"id">() = id;
+	}
+};
 
 /**
  * @brief Represents a code fragment
  */
-
 using code_fragment = std::pair<std::size_t, std::string>;
 
 } // Syntax
@@ -1412,42 +1288,50 @@ struct Lisp::TypeConverter<Syntax::code_fragment>
 };
 
 namespace Syntax {
-struct Code : public Element
+struct Code : public NMLO<Syntax::CODE, "Code",
+		NMLOField<std::string, "language">,
+		NMLOField<std::string, "name">,
+		NMLOField<std::string, "style_file">,
+		NMLOField<std::vector<Syntax::code_fragment>, "content">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _language Fragment's language
-	 * @param _name Fragment's name
-	 * @param _content Fragment's content
-	 * @param _style_file File containing custom style for code fragment
+	 * @param language Fragment's language
+	 * @param name Fragment's name
+	 * @param content Fragment's content
+	 * @param style_file File containing custom style for code fragment
 	 */
-	[[nodiscard]] Code(std::string&& language, std::string&& name, std::string&& style_file, std::vector<code_fragment>&& content):
-		language(std::move(language)), name(std::move(name)), style_file(std::move(style_file)), content(std::move(content)) {}
-
-DEFTYPE(Code, CODE,
-	std::string, language,
-	std::string, name,
-	std::string, style_file,
-	std::vector<Syntax::code_fragment>, content)
+	[[nodiscard]] Code(std::string&& language, std::string&& name, std::string&& style_file, std::vector<code_fragment>&& content)
+	{
+		get<"language">() = std::move(language);
+		get<"name">() = std::move(name);
+		get<"style_file">() = std::move(style_file);
+		get<"content">() = std::move(content);
+	}
+};
 
 /**
  * @brief Represents a quote
  */
-struct Quote : public Element
+struct Quote : public NMLO<Syntax::QUOTE, "Quote",
+		NMLOField<SyntaxTree, "quote">,
+		NMLOField<std::string, "author">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _quote Quote's content
-	 * @param _author Quote's author(s)
+	 * @param quote Quote's content
+	 * @param author Quote's author(s)
 	 */
-	[[nodiscard]] Quote(SyntaxTree&& quote, std::string&& author):
-		quote(std::move(quote)), author(std::move(author)) {}
-
-DEFTYPE(Quote, QUOTE,
-	SyntaxTree, quote,
-	std::string, author)
+	[[nodiscard]] Quote(SyntaxTree&& quote, std::string&& author)
+	{
+		get<"quote">() = std::move(quote);
+		get<"author">() = std::move(author);
+	}
+};
 
 MAKE_CENUM_Q(RefType, std::uint8_t,
 	FIGURE, 0,
@@ -1470,40 +1354,47 @@ namespace Syntax {
 /**
  * @brief Represents an internal reference
  */
-struct Reference : public Element
+struct Reference : public NMLO<Syntax::REFERENCE, "Reference",
+		NMLOField<std::string, "referencing">,
+		NMLOField<std::string, "name">,
+		NMLOField<Syntax::RefType, "type">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _referencing Name of referenced object
-	 * @param _name Custom display name
-	 * @param _type Type of referenced object
+	 * @param referencing Name of referenced object
+	 * @param name Custom display name
+	 * @param type Type of referenced object
 	 */
-	[[nodiscard]] Reference(std::string&& referencing, std::string&& name, RefType type):
-		referencing(std::move(referencing)), name(std::move(name)), type(std::move(type)) {}
-
-DEFTYPE(Reference, REFERENCE,
-	std::string, referencing,
-	std::string, name,
-	Syntax::RefType, type)
+	[[nodiscard]] Reference(std::string&& referencing, std::string&& name, RefType type)
+	{
+		get<"referencing">() = std::move(referencing);
+		get<"name">() = std::move(name);
+		get<"type">() = std::move(type);
+	}
+};
 
 /**
  * @brief Represents a link
  */
-struct Link : public Element
+struct Link : public NMLO<Syntax::LINK, "Link",
+		NMLOField<std::string, "name">,
+		NMLOField<std::string, "path">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _name Link's display name
-	 * @param _path Link's path
+	 * @param name Link's display name
+	 * @param path Link's path
 	 */
-	[[nodiscard]] Link(std::string&& name, std::string&& path):
-		name(std::move(name)), path(std::move(path)) {}
-
-DEFTYPE(Link, LINK,
-	std::string, name,
-	std::string, path)
+	[[nodiscard]] Link(std::string&& name, std::string&& path)
+	{
+		get<"name">() = std::move(name);
+		get<"path">() = std::move(path);
+	}
+};
 
 MAKE_CENUM_Q(TexMode, std::uint8_t,
 	NORMAL, 0,
@@ -1528,7 +1419,15 @@ namespace Syntax {
 /**
  * @brief Represents latex code
  */
-struct Latex : public Element
+struct Latex : public NMLO<Syntax::LATEX, "Latex",
+		NMLOField<std::string, "content">,
+		NMLOField<std::string, "filename">,
+		NMLOField<std::string, "preamble">,
+		NMLOField<std::string, "prepend">,
+		NMLOField<std::string, "append">,
+		NMLOField<std::string, "font_size">,
+		NMLOField<Syntax::TexMode, "mode">
+	>
 {
 	/**
 	 * @brief Constructor
@@ -1538,71 +1437,81 @@ struct Latex : public Element
 	 * @param preamble Preamble to use
 	 * @param mode Latex mode
 	 */
-	[[nodiscard]] Latex(std::string&& content, std::string&& filename, std::string&& preamble, std::string&& prepend, std::string&& append, std::string&& font_size, TexMode mode):
-		content(std::move(content)), filename(std::move(filename)), preamble(std::move(preamble)), prepend(std::move(prepend)), append(std::move(append)), font_size(std::move(font_size)), mode(mode) {}
-
-DEFTYPE(Latex, LATEX,
-	std::string, content,
-	std::string, filename,
-	std::string, preamble,
-	std::string, prepend,
-	std::string, append,
-	std::string, font_size,
-	Syntax::TexMode, mode)
+	[[nodiscard]] Latex(std::string&& content, std::string&& filename, std::string&& preamble, std::string&& prepend, std::string&& append, std::string&& font_size, TexMode mode)
+	{
+		get<"content">() = std::move(content);
+		get<"filename">() = std::move(filename);
+		get<"preamble">() = std::move(preamble);
+		get<"prepend">() = std::move(prepend);
+		get<"append">() = std::move(append);
+		get<"font_size">() = std::move(font_size);
+		get<"mode">() = mode;
+	}
+};
 
 /**
  * @brief Represents raw code fragment
  */
-struct Raw : public Element
+struct Raw : public NMLO<Syntax::RAW, "Raw",
+		NMLOField<std::string, "content">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _content Raw content
+	 * @param content Raw content
 	 */
-	[[nodiscard]] Raw(std::string&& content):
-		content(std::move(content)) {}
-
-DEFTYPE(Raw, RAW,
-	std::string, content)
+	[[nodiscard]] Raw(std::string&& content)
+	{
+		get<"content">() = std::move(content);
+	}
+};
 
 /**
  * @brief Represents inline raw code fragment
  */
-struct RawInline : public Element
+struct RawInline : public NMLO<Syntax::RAW_INLINE, "RawInline",
+		NMLOField<std::string, "content">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _content Raw content
+	 * @param content Inline raw content
 	 */
-	[[nodiscard]] RawInline(std::string&& content):
-		content(std::move(content)) {}
-
-DEFTYPE(RawInline, RAW_INLINE,
-	std::string, content)
+	[[nodiscard]] RawInline(std::string&& content)
+	{
+		get<"content">() = std::move(content);
+	}
+};
 
 /**
  * @brief Represents an external reference
  */
-struct ExternalRef : public Element
+struct ExternalRef : public NMLO<Syntax::EXTERNAL_REF, "ExternalRef",
+		NMLOField<std::string, "desc">,
+		NMLOField<std::string, "author">,
+		NMLOField<std::string, "url">,
+		NMLOField<std::size_t, "num">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _desc Description
-	 * @param _author Author (empty if none)
-	 * @param _url Url
-	 * @param _num Reference's number
+	 * @param desc Description
+	 * @param author Author (empty if none)
+	 * @param url Url
+	 * @param num Reference's number
 	 */
-	[[nodiscard]] ExternalRef(std::string&& desc, std::string&& author, std::string&& url, std::size_t num):
-		desc(std::move(desc)), author(std::move(author)), url(std::move(url)), num(num) {}
+	[[nodiscard]] ExternalRef(std::string&& desc, std::string&& author, std::string&& url, std::size_t num)
+	{
+		get<"desc">() = std::move(desc);
+		get<"author">() = std::move(author);
+		get<"url">() = std::move(url);
+		get<"num">() = num;
+	}
 
-DEFTYPE(ExternalRef, EXTERNAL_REF,
-	std::string, desc,
-	std::string, author,
-	std::string, url,
-	std::size_t, num)
+};
 
 MAKE_CENUM_Q(PresType, std::uint8_t,
 	CENTER, 0,
@@ -1627,67 +1536,85 @@ namespace Syntax {
 /**
  * @brief Represents a presentation element
  */
-struct Presentation : public Element
+struct Presentation : public NMLO<Syntax::PRESENTATION, "Presentation",
+		NMLOField<SyntaxTree, "content">,
+		NMLOField<Syntax::PresType, "type">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _content Content
-	 * @param _type Presentation type
+	 * @param content Content
+	 * @param type Presentation type
 	 */
-	[[nodiscard]] Presentation(SyntaxTree&& content, PresType type):
-		content(std::move(content)), type(type) {}
-
-DEFTYPE(Presentation, PRESENTATION,
-	SyntaxTree, content,
-	Syntax::PresType, type)
+	[[nodiscard]] Presentation(SyntaxTree&& content, PresType type)
+	{
+		get<"content">() = std::move(content);
+		get<"type">() = type;
+	}
+};
 
 /**
  * @brief Represents an annotation
  */
-struct Annotation : public Element
+struct Annotation : public NMLO<Syntax::ANNOTATION, "Annotation",
+		NMLOField<SyntaxTree, "name">,
+		NMLOField<SyntaxTree, "content">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
-	 * @param _name What to hover on
-	 * @param _content Content shown when hovered
+	 * @param name What to hover on
+	 * @param content Content shown when hovered
 	 */
-	[[nodiscard]] Annotation(SyntaxTree&& name, SyntaxTree&& content):
-		name(std::move(name)), content(std::move(content)){}
+	[[nodiscard]] Annotation(SyntaxTree&& name, SyntaxTree&& content)
+	{
+		get<"name">() = std::move(name);
+		get<"content">() = std::move(content);
+	}
 
-DEFTYPE(Annotation, ANNOTATION,
-	SyntaxTree, name,
-	SyntaxTree, content)
+};
 
-
-struct CustomStylePush : public Element
+/**
+ * @brief Custom style being added
+ */
+struct CustomStylePush : public NMLO<Syntax::CUSTOM_STYLEPUSH, "CustomStylePush",
+		NMLOField<CustomStyle, "style">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
 	 * @param style Style pushed
 	 */
-	[[nodiscard]] CustomStylePush(const CustomStyle& style) noexcept:
-		style(style) {}
+	[[nodiscard]] CustomStylePush(const CustomStyle& style) noexcept
+	{ get<"style">() = style; }
+};
 
-DEFTYPE(CustomStylePush, CUSTOM_STYLEPUSH,
-	CustomStyle, style)
-
-struct CustomStylePop : public Element
+/**
+ * @brief Custom style being removed
+ */
+struct CustomStylePop : public NMLO<Syntax::CUSTOM_STYLEPOP, "CustomStylePop",
+		NMLOField<CustomStyle, "style">
+	>
 {
 	/**
 	 * @brief Constructor
 	 *
 	 * @param style Style popped
 	 */
-	[[nodiscard]] CustomStylePop(const CustomStyle& style) noexcept:
-		style(style) {}
+	[[nodiscard]] CustomStylePop(const CustomStyle& style) noexcept
+	{ get<"style">() = style; }
+};
 
-DEFTYPE(CustomStylePop, CUSTOM_STYLEPOP,
-	CustomStyle, style)
-
-struct CustomPresPush : public Element
+/**
+ * @brief Custom presentation being added
+ */
+struct CustomPresPush : public NMLO<Syntax::CUSTOM_PRESPUSH, "CustomPresPush",
+		NMLOField<CustomPres, "pres">,
+		NMLOField<std::size_t, "level">
+	>
 {
 	/**
 	 * @brief Constructor
@@ -1695,14 +1622,20 @@ struct CustomPresPush : public Element
 	 * @param pres Presentation pushed
 	 * @param level Nest level
 	 */
-	[[nodiscard]] CustomPresPush(const CustomPres& pres, std::size_t level) noexcept:
-		pres(pres), level(level) {}
+	[[nodiscard]] CustomPresPush(const CustomPres& pres, std::size_t level) noexcept
+	{
+		get<"pres">() = pres;
+		get<"level">() = level;
+	}
+};
 
-DEFTYPE(CustomPresPush, CUSTOM_PRESPUSH,
-	CustomPres, pres,
-	std::size_t, level)
-
-struct CustomPresPop : public Element
+/**
+ * @brief Custom presentation being removed
+ */
+struct CustomPresPop : public NMLO<Syntax::CUSTOM_PRESPOP, "CustomPresPop",
+		NMLOField<CustomPres, "pres">,
+		NMLOField<std::size_t, "level">
+	>
 {
 	/**
 	 * @brief Constructor
@@ -1710,12 +1643,12 @@ struct CustomPresPop : public Element
 	 * @param pres Presentation popped
 	 * @param level Nest level
 	 */
-	[[nodiscard]] CustomPresPop(const CustomPres& pres, std::size_t level) noexcept:
-		pres(pres), level(level) {}
-
-DEFTYPE(CustomPresPop, CUSTOM_PRESPOP,
-	CustomPres, pres,
-	std::size_t, level)
+	[[nodiscard]] CustomPresPop(const CustomPres& pres, std::size_t level) noexcept
+	{
+		get<"pres">() = pres;
+		get<"level">() = level;
+	}
+};
 
 //}}}
 

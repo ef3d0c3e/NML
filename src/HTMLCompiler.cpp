@@ -1,6 +1,7 @@
 #include "HTMLCompiler.hpp"
 #include "Syntax.hpp"
 #include "Highlight.hpp"
+#include "Cache.hpp"
 
 #include <set>
 #include <fmt/format.h>
@@ -121,7 +122,7 @@ struct HTMLData
 		first = false;
 	}
 
-	return fmt::format("{}{}{}", number, ".", sec.title);
+	return fmt::format("{}{}{}", number, ".", sec.get<"title">());
 }
 
 MAKE_CENUM_Q(FigureType, std::uint8_t,
@@ -132,12 +133,12 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 
 [[nodiscard]] static FigureType getFigureType(const Syntax::Figure& fig)
 {
-	const auto pos{fig.path.rfind('.')};
+	const auto pos{fig.get<"path">().rfind('.')};
 	if (pos == std::string::npos) [[unlikely]]
-		throw Error(fmt::format("Cannot determine type of figure '![{}]({})', missing extension", fig.name, fig.path));
-	const std::string_view ext{fig.path.substr(pos+1)};
+		throw Error(fmt::format("Cannot determine type of figure '![{}]({})', missing extension", fig.get<"name">(), fig.get<"path">()));
+	const std::string_view ext{fig.get<"path">().substr(pos+1)};
 	if (ext.empty()) [[unlikely]]
-		throw Error(fmt::format("Cannot determine type of figure '![{}]({})', missing extension", fig.name, fig.path));
+		throw Error(fmt::format("Cannot determine type of figure '![{}]({})', missing extension", fig.get<"name">(), fig.get<"path">()));
 
 	if (ext == "png"sv  ||
 		ext == "jpg"sv  ||
@@ -158,12 +159,14 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 		ext == "webm"sv)
 		return FigureType::VIDEO;
 
-	throw Error(fmt::format("Cannot determine type of figure '![{}]({})', unknown extension '{}'", fig.name, fig.path, ext));
+	throw Error(fmt::format("Cannot determine type of figure '![{}]({})', unknown extension '{}'", fig.get<"name">(), fig.get<"path">(), ext));
 }
 
 [[nodiscard]] std::string HTMLCompiler::compile(const Document& doc, const CompilerOptions& opts) const
 {
 	HTMLData hdata;
+	Cache cache{opts.cache_dir};
+
 	//{{{ generate
 	std::function<std::string(const SyntaxTree&, std::size_t)> generate = [&](const SyntaxTree& tree, std::size_t depth) -> std::string
 	{
@@ -215,14 +218,14 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 				case Syntax::TEXT:
 				{
 					const auto& text = *reinterpret_cast<const Syntax::Text*>(elem);
-					html.append(format(text.content));
+					html.append(format(text.get<"content">()));
 
 					break;
 				}
 				case Syntax::STYLEPUSH:
 				{
 					const auto& p = *reinterpret_cast<const Syntax::StylePush*>(elem);
-					switch (p.style)
+					switch (p.get<"style">())
 					{
 						case Syntax::Style::BOLD:
 							html.append("<b>"sv); break;
@@ -239,7 +242,7 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 				case Syntax::STYLEPOP:
 				{
 					const auto& p = *reinterpret_cast<const Syntax::StylePop*>(elem);
-					switch (p.style)
+					switch (p.get<"style">())
 					{
 						case Syntax::Style::BOLD:
 							html.append("</b>"sv); break;
@@ -256,12 +259,12 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 				case Syntax::BREAK:
 				{
 					const auto& br = *reinterpret_cast<const Syntax::Break*>(elem);
-					if (br.size == 0)
+					if (br.get<"size">() == 0)
 						break;
 
 					html.push_back('\n');
 					append(depth, "");
-					for (std::size_t i = 0; i < br.size; ++i)
+					for (std::size_t i = 0; i < br.get<"size">(); ++i)
 						html.append("<br>");
 					html.push_back('\n');
 					append(depth, "");
@@ -272,11 +275,11 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 					const auto& section = *reinterpret_cast<const Syntax::Section*>(elem);
 					//if (last_type == Syntax::SECTION)
 					append(depth, "<br>\n");
-					if (section.numbered)
+					if (section.get<"numbered">())
 					{
-						while (sections.size() > section.level)
+						while (sections.size() > section.get<"level">())
 							sections.pop_back();
-						while (sections.size() < section.level)
+						while (sections.size() < section.get<"level">())
 							sections.push_back(0);
 						++sections.back();
 
@@ -295,11 +298,11 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 							default: break;
 						}
 						html.append(fmt::format(fmt::runtime(f),
-							std::min(1+section.level, 6ul),
+							std::min(1+section.get<"level">(), 6ul),
 							format((hdata.orderedSectionFormatter.has_value())
 								? hdata.orderedSectionFormatter.value().call(Lisp::to_scm(section), Lisp::to_scm(sections))
 								: getSectionFullName(section, sections)),
-							get_anchor(section.title),
+							get_anchor(section.get<"title">()),
 							hdata.section_link)
 						);
 					}
@@ -320,11 +323,11 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 							default: break;
 						}
 						html.append(fmt::format(fmt::runtime(f),
-							std::min(1+section.level, 6ul),
+							std::min(1+section.get<"level">(), 6ul),
 							format((hdata.unorderedSectionFormatter.has_value())
 								? hdata.unorderedSectionFormatter.value().call(Lisp::to_scm(section), Lisp::to_scm(sections))
-								: section.title),
-							get_anchor(section.title),
+								: section.get<"title">()),
+							get_anchor(section.get<"title">()),
 							hdata.section_link)
 						);
 					}
@@ -355,39 +358,39 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 					const Syntax::ListEntry& ent = *reinterpret_cast<const Syntax::ListEntry*>(elem);
 					const Syntax::ListBegin& delim = *list_delimiters.top();
 
-					if (delim.ordered)
+					if (delim.get<"ordered">())
 					{
-						const Syntax::OrderedBullet& bullet = std::get<Syntax::OrderedBullet>(delim.bullet);
-						if (delim.style.empty())
+						const Syntax::OrderedBullet& bullet = std::get<Syntax::OrderedBullet>(delim.get<"bullet">());
+						if (delim.get<"style">().empty())
 							append(depth, fmt::format("<li><a class=\"bullet\">{}{}{}</a>\n",
 									format(bullet.left),
-									format(bullet.get(ent.counter)),
+									format(bullet.get(ent.get<"counter">())),
 									format(bullet.right)
 								));
 						else
 							append(depth, fmt::format("<li><a class=\"bullet\" style=\"{}\">{}{}{}</a>\n",
-									format(delim.style),
+									format(delim.get<"style">()),
 									format(bullet.left),
-									format(bullet.get(ent.counter)),
+									format(bullet.get(ent.get<"counter">())),
 									format(bullet.right)
 								));
 						
-						html.append(generate(ent.content, depth+1));
+						html.append(generate(ent.get<"content">(), depth+1));
 					}
 					else
 					{
-						const Syntax::UnorderedBullet& bullet = std::get<Syntax::UnorderedBullet>(delim.bullet);
-						if (delim.style.empty())
+						const Syntax::UnorderedBullet& bullet = std::get<Syntax::UnorderedBullet>(delim.get<"bullet">());
+						if (delim.get<"style">().empty())
 							append(depth, fmt::format("<li><a class=\"bullet\">{}</a>\n",
 										format(bullet.bullet)
 									));
 						else
 							append(depth, fmt::format("<li><a class=\"bullet\" style=\"{}\">{}</a>\n",
-										format(delim.style),
+										format(delim.get<"style">()),
 										format(bullet.bullet)
 									));
 
-						html.append(generate(ent.content, depth+1));
+						html.append(generate(ent.get<"content">(), depth+1));
 					}
 					append(depth, fmt::format("</li>\n"));
 
@@ -407,19 +410,19 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 					switch (getFigureType(fig))
 					{
 						case FigureType::PICTURE:
-							append(depth+2, fmt::format("<a href=\"{0}\"><img src=\"{0}\"></a>\n", fig.path));
+							append(depth+2, fmt::format("<a href=\"{0}\"><img src=\"{0}\"></a>\n", fig.get<"path">()));
 							break;
 						case FigureType::AUDIO: // TODO
 							break;
 						case FigureType::VIDEO:
-							append(depth+2, fmt::format("<video src=\"{}\" controls></video>\n", fig.path));
+							append(depth+2, fmt::format("<video src=\"{}\" controls></video>\n", fig.get<"path">()));
 							break;
 						default: break;
 					}
 
 					// Description
-					append(depth+2, fmt::format("<p><b>({})</b></p>\n", fig.id));
-					html.append(generate(fig.description, depth+2));
+					append(depth+2, fmt::format("<p><b>({})</b></p>\n", fig.get<"id">()));
+					html.append(generate(fig.get<"description">(), depth+2));
 					append(depth+1, "</div>\n");
 					break;
 				}
@@ -428,18 +431,18 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 					const Syntax::Code& code = *reinterpret_cast<const Syntax::Code*>(elem);
 
 					append(depth, "<div class=\"highlight\">\n");
-					if (!code.name.empty())
-						append(depth+1, fmt::format("<div class=\"highlight-title\">{}</div>\n", format(code.name)));
+					if (!code.get<"name">().empty())
+						append(depth+1, fmt::format("<div class=\"highlight-title\">{}</div>\n", format(code.get<"name">())));
 					append(depth+1, "<div class=\"highlight-content\">\n");
 
 					// List of all lines
 					std::vector<std::pair<std::size_t, std::string>> lines;
 
 					// Build lines vector
-					for (const auto& [start_line, content] : code.content)
+					for (const auto& [start_line, content] : code.get<"content">())
 					{
 						// Get formatted string
-						std::string source = Highlight<HighlightTarget::HTML>(content, code.language, code.style_file);
+						std::string source = Highlight<HighlightTarget::HTML>(content, code.get<"language">(), code.get<"style_file">());
 						// Remove source-highlight comment
 						std::string_view formatted{std::string_view{source}.substr(source.find("-->\n") + 4)};
 
@@ -497,10 +500,10 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 
 					append(depth, "<blockquote>\n");
 
-					html.append(generate(quote.quote, depth+1));
-					if (!quote.author.empty())
+					html.append(generate(quote.get<"quote">(), depth+1));
+					if (!quote.get<"author">().empty())
 						append(depth+1, fmt::format("<p class=\"quote-author\">{}</p>\n",
-									replace_each(quote.author.substr(0, quote.author.size()-1),
+									replace_each(quote.get<"author">().substr(0, quote.get<"author">().size()-1),
 							std::array<std::pair<char, std::string_view>, 1>{
 								std::make_pair<char, std::string_view>('\n', " "sv)
 							})));
@@ -512,15 +515,15 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 				case Syntax::REFERENCE:
 				{
 					const auto& ref = *reinterpret_cast<const Syntax::Reference*>(elem);
-					const Syntax::Figure* fig = doc.figure_get(ref.referencing);
+					const Syntax::Figure* fig = doc.figure_get(ref.get<"referencing">());
 					if (!fig) [[unlikely]]
-						throw Error(fmt::format("Could not find figure with name '{}'", ref.referencing));
+						throw Error(fmt::format("Could not find figure with name '{}'", ref.get<"referencing">()));
 					switch (getFigureType(*fig))
 					{
 						case FigureType::PICTURE:
 							html.append(fmt::format("<b class=\"figure-ref\"><a class=\"figure-ref\">({})</a><img src=\"{}\"></b>",
-										fig->id,
-										format(fig->path)));
+										fig->get<"id">(),
+										format(fig->get<"path">())));
 							break;
 						default:
 							throw Error("Figure references is supported for pictures only");
@@ -531,7 +534,7 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 				case Syntax::LINK:
 				{
 					const Syntax::Link& link = *reinterpret_cast<const Syntax::Link*>(elem);
-					html.append(fmt::format("<a class=\"link\" href=\"{}\">{}</a>", format(link.path), format(link.name)));
+					html.append(fmt::format("<a class=\"link\" href=\"{}\">{}</a>", format(link.get<"path">()), format(link.get<"name">())));
 					break;
 				}
 				case Syntax::LATEX:
@@ -551,7 +554,7 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 					const Syntax::Raw& raw = *reinterpret_cast<const Syntax::Raw*>(elem);
 					std::string replace(depth+1, '\t');
 					replace.front() = '\n';
-					append(depth, replace_each(raw.content,
+					append(depth, replace_each(raw.get<"content">(),
 						std::array<std::pair<char, std::string_view>, 1>{std::make_pair<char, std::string_view>('\n', replace)}));
 					html.append("\n");
 					break;
@@ -562,42 +565,42 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 					std::string replace(depth+1, '\t');
 					replace.front() = '\n';
 					if (isTextLike(last_type))
-						html.append(replace_each(raw.content,
+						html.append(replace_each(raw.get<"content">(),
 							std::array<std::pair<char, std::string_view>, 1>{std::make_pair<char, std::string_view>('\n', replace)}));
 					else
-						append(depth, replace_each(raw.content,
+						append(depth, replace_each(raw.get<"content">(),
 							std::array<std::pair<char, std::string_view>, 1>{std::make_pair<char, std::string_view>('\n', replace)}));
 					break;
 				}
 				case Syntax::EXTERNAL_REF:
 				{
 					const Syntax::ExternalRef& ref = *reinterpret_cast<const Syntax::ExternalRef*>(elem);
-					html.append(fmt::format("<sup><a class=\"external-ref\" id=\"ref_{0}from\" href=\"#ref_{0}\" alt=\"{1}\">[{0}]</a></sup>", ref.num, format(ref.desc)));
+					html.append(fmt::format("<sup><a class=\"external-ref\" id=\"ref_{0}from\" href=\"#ref_{0}\" alt=\"{1}\">[{0}]</a></sup>", ref.get<"num">(), format(ref.get<"desc">())));
 					break;
 				}
 				case Syntax::PRESENTATION:
 				{
 					const Syntax::Presentation& pres = *reinterpret_cast<const Syntax::Presentation*>(elem);
-					if (pres.type == Syntax::PresType::CENTER)
+					if (pres.get<"type">() == Syntax::PresType::CENTER)
 					{
 						append(depth, "<center>\n");
-						html.append(generate(pres.content, depth+1));
+						html.append(generate(pres.get<"content">(), depth+1));
 						append(depth, "</center>\n");
 					}
-					else if (pres.type == Syntax::PresType::BOX)
+					else if (pres.get<"type">() == Syntax::PresType::BOX)
 					{
 						append(depth, "<div class=\"box\">\n");
-						html.append(generate(pres.content, depth+1));
+						html.append(generate(pres.get<"content">(), depth+1));
 						append(depth, "</div>\n");
 					}
-					else if (pres.type == Syntax::PresType::LEFT_LINE)
+					else if (pres.get<"type">() == Syntax::PresType::LEFT_LINE)
 					{
 						append(depth, "<div class=\"left-line\">\n");
-						html.append(generate(pres.content, depth+1));
+						html.append(generate(pres.get<"content">(), depth+1));
 						append(depth, "</div>\n");
 					}
 					else
-						throw Error(fmt::format("Unsupported presentation type : {}", pres.type.value));
+						throw Error(fmt::format("Unsupported presentation type : {}", pres.get<"type">().value));
 					break;
 				}
 				case Syntax::ANNOTATION:
@@ -607,10 +610,10 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 						html.append("\n");
 
 					append(depth, "<div class=\"annotation\">\n");
-					html.append(generate(anno.name, depth+1));
+					html.append(generate(anno.get<"name">(), depth+1));
 					append(depth, "</div>\n");
 					append(depth, "<div class=\"hide\">\n");
-					html.append(generate(anno.content, depth+1));
+					html.append(generate(anno.get<"content">(), depth+1));
 					append(depth, "</div>\n");
 					break;
 				}
@@ -618,21 +621,21 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 				{
 					const auto& push = *reinterpret_cast<const Syntax::CustomStylePush*>(elem);
 
-					html.append(push.style.begin.call());
+					html.append(push.get<"style">().begin.call());
 					break;
 				}
 				case Syntax::CUSTOM_STYLEPOP:
 				{
 					const auto& push = *reinterpret_cast<const Syntax::CustomStylePop*>(elem);
 
-					html.append(push.style.end.call());
+					html.append(push.get<"style">().end.call());
 					break;
 				}
 				case Syntax::CUSTOM_PRESPUSH:
 				{
 					const auto& push = *reinterpret_cast<const Syntax::CustomPresPush*>(elem);
 
-					append(depth, push.pres.begin.call(Lisp::TypeConverter<std::size_t>::from(push.level)));
+					append(depth, push.get<"pres">().begin.call(Lisp::TypeConverter<std::size_t>::from(push.get<"level">())));
 					html.append("\n");
 					++depth;
 					break;
@@ -642,7 +645,7 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 					const auto& push = *reinterpret_cast<const Syntax::CustomPresPop*>(elem);
 
 					--depth;
-					append(depth, push.pres.end.call(Lisp::TypeConverter<std::size_t>::from(push.level)));
+					append(depth, push.get<"pres">().end.call(Lisp::TypeConverter<std::size_t>::from(push.get<"level">())));
 					html.append("\n");
 					break;
 				}
@@ -734,13 +737,13 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 		std::size_t depth = 0;
 		for (const auto& [num, sec] : doc.get_header())
 		{
-			while (depth < sec->level)
+			while (depth < sec->get<"level">())
 				++depth, html.append("\t\t\t<ul>\n");
-			while (depth > sec->level)
+			while (depth > sec->get<"level">())
 				--depth, html.append("\t\t\t</ul>\n");
 			html.append(fmt::format(
 					"\t\t\t\t<li><a href=\"#{}\">{}</a></li>\n",
-					get_anchor(sec->title), format(sec->title)));
+					get_anchor(sec->get<"title">()), format(sec->get<"title">())));
 		}
 		while (depth > 0)
 			--depth, html.append("\t\t\t</ul>\n");
@@ -759,19 +762,22 @@ MAKE_CENUM_Q(FigureType, std::uint8_t,
 			.append("		<ul>\n");
 		for (const auto ref : doc.get_external_refs())
 		{
-			if (ref->author.empty())
+			if (ref->get<"author">().empty())
 			{
-				if (ref->url.empty())
-					html.append(fmt::format("\t\t\t<li id=\"ref_{0}\">{0}. <a href=\"ref_{0}from\">^</a> <i>{1}</i></li>\n", ref->num, ref->desc));
+				if (ref->get<"url">().empty())
+					html.append(fmt::format("\t\t\t<li id=\"ref_{0}\">{0}. <a href=\"ref_{0}from\">^</a> <i>{1}</i></li>\n", ref->get<"num">(), ref->get<"desc">()));
 				else
-					html.append(fmt::format("\t\t\t<li id=\"ref_{0}\">{0}. <a href=\"ref_{0}from\">^</a> <i><a class=\"link\" href=\"{1}\">{2}</a></i></li>\n", ref->num, ref->url, ref->desc));
+					html.append(fmt::format("\t\t\t<li id=\"ref_{0}\">{0}. <a href=\"ref_{0}from\">^</a> <i><a class=\"link\" href=\"{1}\">{2}</a></i></li>\n",
+								ref->get<"num">(), ref->get<"url">(), ref->get<"desc">()));
 			}
 			else
 			{
-				if (ref->url.empty())
-					html.append(fmt::format("\t\t\t<li id=\"ref_{0}\">{0}. <a href=\"ref_{0}from\">^</a> {1}, <i>{2}</i></li>\n", ref->num, ref->author, ref->desc));
+				if (ref->get<"url">().empty())
+					html.append(fmt::format("\t\t\t<li id=\"ref_{0}\">{0}. <a href=\"ref_{0}from\">^</a> {1}, <i>{2}</i></li>\n", ref->get<"num">(), ref->get<"author">(),
+								ref->get<"desc">()));
 				else
-					html.append(fmt::format("\t\t\t<li id=\"ref_{0}\">{0}. <a href=\"#ref_{0}from\">^</a> {1}, <i><a class=\"link\" href=\"{2}\">{3}</a></i></li>\n", ref->num, ref->author, ref->url, ref->desc));
+					html.append(fmt::format("\t\t\t<li id=\"ref_{0}\">{0}. <a href=\"#ref_{0}from\">^</a> {1}, <i><a class=\"link\" href=\"{2}\">{3}</a></i></li>\n",
+								ref->get<"num">(), ref->get<"author">(), ref->get<"url">(), ref->get<"desc">()));
 			}
 		}
 		html.append("		</ul>\n")

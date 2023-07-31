@@ -16,17 +16,18 @@ int main(int argc, char* argv[])
 {
 	std::setlocale(LC_ALL, "en_US.UTF-8");
 
-	cxxopts::Options opts("NMl", "NML is not a markup language");
+	cxxopts::Options opts("NML", "NML is not a markup language");
 
-	std::string tex_dir, cxx_dir, in_file, out_file, compiler;
+	std::string tex_dir, cache_dir, in_file, out_file, compiler;
 	std::vector<std::string> printing;
 	opts.add_options()
 		("h,help",    "Displays help", cxxopts::value<bool>()->default_value("false"))
 		("v,version", "Displays version", cxxopts::value<bool>()->default_value("false"))
 		("t,tex-directory", "Sets tex output directory", cxxopts::value<std::string>(tex_dir)->default_value("tex"))
 		("no-tex", "Disables tex processing", cxxopts::value<bool>()->default_value("false"))
-		("x,cxx-directory", "Sets cxxabi output directory", cxxopts::value<std::string>(cxx_dir)->default_value("cxxabi"))
-		("no-cxx", "Disables cxxabi processing", cxxopts::value<bool>()->default_value("false"))
+		("cache-dir", "Sets the cache directory", cxxopts::value<std::string>(cache_dir)->default_value("cache"))
+		("no-cache", "Disables caching", cxxopts::value<bool>()->default_value("false"))
+		("cxx", "Enables cxxabi processing (Requires cache)", cxxopts::value<bool>()->default_value("false"))
 		("i,input", "Sets input file", cxxopts::value<std::string>(in_file))
 		("o,output", "Sets output file", cxxopts::value<std::string>(out_file))
 		("c,compiler", "Sets compiler", cxxopts::value<std::string>(compiler)->default_value("text"))
@@ -113,12 +114,18 @@ int main(int argc, char* argv[])
 		}
 		
 		const bool noTexDir = !result.count("no-tex") && (!std::filesystem::exists(tex_dir) || !std::filesystem::is_directory(tex_dir));
-		const bool noCxxDir = !result.count("no-cxx") && (!std::filesystem::exists(cxx_dir) || !std::filesystem::is_directory(cxx_dir));
+		const bool noCacheDir = !result.count("no-cache") && (!std::filesystem::exists(cache_dir) || !std::filesystem::is_directory(cache_dir));
+		if (result.count("cxx") && noCacheDir) [[unlikely]]
+		{
+			std::cerr << "Cache must be enabled for CXX processing, see --help for more information" << std::endl;
+			std::exit(EXIT_FAILURE);
+		}
 		CompilerOptions opts = {
 			.tex_enabled = !noTexDir,
 			.tex_dir = tex_dir,
-			.cxx_enabled = !noCxxDir,
-			.cxx_dir = cxx_dir,
+			.cache_enabled = !noCacheDir,
+			.cache_dir = cache_dir,
+			.cxx_enabled = result.count("cxx") != 0,
 		};
 		Benchmarker.pop(); // Fetching compiler
 

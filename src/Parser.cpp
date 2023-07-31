@@ -161,22 +161,12 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 
 	closeList(doc, f, data);
 
-	// Merge with previous element if it's text
-	if (doc.empty()) [[unlikely]]
-	{
+	if (doc.empty() || doc.back()->get_type() != Syntax::TEXT) // Create new Text elemeent
 		doc.emplace_back<Syntax::Text>(append);
-	}
-	else if (doc.back()->get_type() == Syntax::TEXT)
+	else // Merge with previous text element
 	{
 		auto& elem = *reinterpret_cast<Syntax::Text*>(doc.back());
-		//if (elem.style == data.style)
-			elem.content.append(append);
-		//else
-			//doc.emplace_back<Syntax::Text>(append);
-	}
-	else
-	{
-		doc.emplace_back<Syntax::Text>(append);
+		elem.get<"content">().append(append);
 	}
 
 	return reinterpret_cast<Syntax::Text*>(doc.back());
@@ -215,7 +205,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 		if (auto ptr = addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos - escape_len/2 - 1)); ptr)
 		{
 			//if (ptr->style == data.style)
-				ptr->content.append(insert);
+				ptr->get<"content">().append(insert);
 			//else
 				//addText(doc, f, data, insert);
 		}
@@ -527,7 +517,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 				);
 
 				// Check if representible
-				if (std::string err = std::get<Syntax::OrderedBullet>(lb->bullet).is_representible(bullet_counter); !err.empty())
+				if (std::string err = std::get<Syntax::OrderedBullet>(lb->get<"bullet">()).is_representible(bullet_counter); !err.empty())
 					throw Error(getErrorMessage(f, "Invalid List Entry", std::move(err), bullet_pos, list.size()));
 			}
 			else
@@ -1098,7 +1088,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 						if (it->get()->get_type() == Syntax::CUSTOM_STYLEPUSH) // Stop here
 						{
 							const auto& push = *reinterpret_cast<const Syntax::CustomStylePush*>(it->get());
-							if (push.style.index == style->index)
+							if (push.get<"style">().index == style->index)
 								break;
 						}
 
@@ -2119,7 +2109,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 			return end();
 
 		const auto& br = *reinterpret_cast<const Syntax::Break*>(e2);
-		if (br.size != 0)
+		if (br.get<"size">() != 0)
 			return end();
 
 		// If previous & next elements are text-like,
@@ -2127,7 +2117,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 		if (e1->get_type() == Syntax::TEXT)
 		{
 			auto& text = *reinterpret_cast<Syntax::Text*>(e1);
-			text.content.push_back(' ');
+			text.get<"content">().push_back(' ');
 		}
 		else
 			doc.tree.insert_before<Syntax::Text>(e2, " "s);

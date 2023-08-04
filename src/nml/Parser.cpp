@@ -1,3 +1,19 @@
+/* NML a simple yet powerful markup language
+   Copyright © 2023 ef3d0c3e
+
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU Affero General Public License as
+   published by the Free Software Foundation, either version 3 of the
+   License, or any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU Affero General Public License for more details.
+
+   You should have received a copy of the GNU Affero General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+
 #include "Parser.hpp"
 #include "Syntax.hpp"
 #include "Compiler.hpp"
@@ -1900,7 +1916,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 
 		doc.emplace_back<Syntax::Break>(num-1);
 
-		return match_pos+num-1;
+		return match_pos+num;
 	});
 	// Short break
 	matches.emplace_back("\n[^\n]"s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)

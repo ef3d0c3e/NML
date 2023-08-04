@@ -1,12 +1,21 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
-PROJECT("nml")
+CMAKE_MINIMUM_REQUIRED(VERSION 3.27)
 
-SET(CMAKE_CXX_FLAGS "-std=c++2b -Wpedantic -Wall")
+PROJECT(nml
+	DESCRIPTION "Simple and powerful markup language compiler"
+	HOMEPAGE_URL "https://github.com/ef3d0c3e/NML"
+	LANGUAGES CXX)
+
+SET(CMAKE_CXX_FLAGS "-std=c++2b -Wpedantic -Wall -Og -ggdb")
 SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-FILE(GLOB SOURCES
-	"src/*.cpp"
-	"src/*.tcc"
+FILE(GLOB NML_SOURCES
+	"src/nml/*.cpp"
+	"src/nml/*.tcc"
+)
+
+FILE(GLOB TEST_SOURCES
+	"src/tests/*.cpp"
+	"src/tests/*.tcc"
 )
 
 FIND_PACKAGE(PkgConfig)
@@ -14,8 +23,18 @@ PKG_CHECK_MODULES(GUILE guile-3.0 REQUIRED IMPORTED_TARGET)
 
 ADD_SUBDIRECTORY(libs/fmt)
 ADD_SUBDIRECTORY(libs/cxxopts)
+ADD_SUBDIRECTORY(libs/Catch2)
+ADD_SUBDIRECTORY(libs/utfcpp)
 
 INCLUDE_DIRECTORIES(libs/cxxopts)
+INCLUDE_DIRECTORIES(libs/utfcpp/sources)
 
-ADD_EXECUTABLE(${CMAKE_PROJECT_NAME} ${SOURCES})
+SET(NML_LIBRARIES fmt PkgConfig::GUILE)
+
+# Build
+ADD_EXECUTABLE(${CMAKE_PROJECT_NAME} src/NML.cpp ${NML_SOURCES})
 TARGET_LINK_LIBRARIES(${CMAKE_PROJECT_NAME} fmt PkgConfig::GUILE)
+
+# Test
+ADD_EXECUTABLE(${CMAKE_PROJECT_NAME}-tests ${NML_SOURCES} ${TEST_SOURCES})
+TARGET_LINK_LIBRARIES(${CMAKE_PROJECT_NAME}-tests PRIVATE Catch2::Catch2WithMain utf8cpp PUBLIC ${NML_LIBRARIES})

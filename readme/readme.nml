@@ -20,6 +20,32 @@ NML is a markup language designed to be featureful. It integrates features from 
 
 It currently is in an unstable stage. You should expect bugs and incomplete feature (CXXABI, NML Object, and Highlight caching).
 
+# Building
+
+NML uses CMake as it's build system. To build NML, you must create a directory where the program will be compiled =build=.
+
+NML requires =libguile= (dev lib) to be installed.
+
+NML can be installed by moving it to your path. Note that this is not a requirement.
+
+
+Here is a summary:
+```sh
+# Clone nml
+git clone https://github.com/ef3d0c3e/nml
+cd nml
+mkdir build && cd build
+# Build
+cmake ..
+make
+# (Optional) Install nml
+mv nml (to a directory in $PATH)
+```
+
+## Additional requirements
+
+In order to enable LaTeX processing, you must install =latex2svg= (found in =nml/readme=) into your path.
+
 # Syntax
 ## Definitions
 
@@ -795,8 +821,6 @@ Below is a list of important procedures and objects:
  * **(string-ends-with *string* *suffix*)**: Returns whether or not =string= ends with =suffix=
  * **(string-starts-with *string* *prefix*)**: Returns whether or not =string= starts with =prefix=
 
-## Working with nml's objetcts
-
 ## Scheme example
 
 **Compiling a NML document from another NML document**
@@ -816,7 +840,37 @@ Below is a list of important procedures and objects:
 
 ## The NML Object interface
 
-TODO
+NML offers it's own interface to allow scheme code to interact with nml data types.
+
+Here's a list of syntax elements that have a scheme interface: 
+=Text=,
+=StylePush=,
+=StylePop=,
+=Break=,
+=Section=,
+=ListBegin=,
+=ListEnd=,
+=ListEntry=,
+=Ruler=,
+=Figure=,
+=Code=,
+=Quote=,
+=Reference=,
+=Link=,
+=Latex=,
+=Raw=,
+=RawInline=,
+=ExternalRef=,
+=Presentation=,
+=Annotation=,
+=CustomStylePush=,
+=CustomStylePop=,
+=CustomPresPush=,
+=CustomPresPop=
+
+
+All of these elements have a =make= method =nmlo-ELEMENT-make=
+And also have setters and getters for each of their members: =nmlo-ELEMENT-FIELD-get= and =nmlo-ELEMENT-FIELD-set=.
 
 # Compilers
 ## Text compiler

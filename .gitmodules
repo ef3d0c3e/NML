@@ -1,0 +1,12 @@
+[submodule "libs/Catch2"]
+	path = libs/Catch2
+	url = https://github.com/catchorg/Catch2
+[submodule "libs/fmt"]
+	path = libs/fmt
+	url = https://github.com/fmtlib/fmt
+[submodule "libs/cxxopts"]
+	path = libs/cxxopts
+	url = https://github.com/jarro2783/cxxopts
+[submodule "libs/utfcpp"]
+	path = libs/utfcpp
+	url = https://github.com/nemtrif/utfcpp

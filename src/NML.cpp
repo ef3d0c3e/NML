@@ -1,14 +1,15 @@
+
 #include <cxxopts.hpp>
 #include <filesystem>
 #include <fstream>
 
-#include "Syntax.hpp"
-#include "Parser.hpp"
-#include "Util.hpp"
-#include "Benchmark.hpp"
+#include "nml/Syntax.hpp"
+#include "nml/Parser.hpp"
+#include "nml/Util.hpp"
+#include "nml/Benchmark.hpp"
 
-#include "TextCompiler.hpp"
-#include "HTMLCompiler.hpp"
+#include "nml/TextCompiler.hpp"
+#include "nml/HTMLCompiler.hpp"
 
 
 

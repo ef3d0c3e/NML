@@ -280,6 +280,17 @@ struct CustomStyle : public CustomType
 	 */
 	[[nodiscard]] CustomStyle() noexcept:
 		CustomType("") {}
+
+	CustomStyle& operator=(const CustomStyle& style)
+	{
+		index = style.index;
+		regex = style.regex;
+		begin = style.begin;
+		end = style.end;
+		apply = style.apply;
+
+		return *this;
+	}
 };
 
 template <>
@@ -675,7 +686,7 @@ public:
 	 *
 	 * @returns Last element
 	 */
-	[[nodiscard]] inline const Syntax::Element* const back() const noexcept
+	[[nodiscard]] inline const Syntax::Element* back() const noexcept
 	{ return tree.elems.back().get(); }
 
 	/**

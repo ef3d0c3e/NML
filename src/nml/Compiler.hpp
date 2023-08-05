@@ -18,17 +18,44 @@
 #define NML_COMPILER_HPP
 
 #include "Syntax.hpp"
+#include <ostream>
 
 /**
  * @brief Options for a compiler
  */
 struct CompilerOptions
 {
-	bool tex_enabled; ///< Whether tex processing is enabled or not
+	std::ostream& stream; ///< Output stream
+
+	/**
+	 * Constructor
+	 *
+	 * @param stream Output stream
+	 */
+	CompilerOptions(std::ostream& stream):
+		stream{stream} {}
+
+	/**
+	 * Options copy constructor
+	 *
+	 * @param opts CompilerOptions to copy options from (not stream)
+	 * @param stream Output stream
+	 */
+	CompilerOptions(const CompilerOptions& opts, std::ostream& stream):
+		stream{stream}
+	{
+		tex_enabled = opts.tex_enabled;
+		tex_dir = opts.tex_dir;
+		cache_enabled = opts.cache_enabled;
+		cache_dir = opts.cache_dir;
+		cxx_enabled = opts.cxx_enabled;
+	}
+
+	bool tex_enabled = false; ///< Whether tex processing is enabled or not
 	std::string tex_dir; ///< Location of tex directory
-	bool cache_enabled; ///< Whether caching is enabled
+	bool cache_enabled = false; ///< Whether caching is enabled
 	std::string cache_dir; ///< Location of cache directory
-	bool cxx_enabled; ///< Whether cxx processing is enabled or not
+	bool cxx_enabled = false; ///< Whether cxx processing is enabled or not
 };
 
 /**
@@ -36,11 +63,27 @@ struct CompilerOptions
  */
 class Compiler
 {
+protected:
+	CompilerOptions m_opts;
 public:
+	/**
+	 * @brief Constructor
+	 * @param opts Options for the compiler
+	 */
+	Compiler(CompilerOptions&& opts):
+		m_opts{std::move(opts)} {}
+
 	/**
 	 * @brief Destructor
 	 */
 	virtual ~Compiler() {}
+
+	/**
+	 * @brief Gets options for compiler
+	 *
+	 * @return Compiler options
+	 */
+	[[nodiscard]] const CompilerOptions& getOptions() const { return m_opts; }
 
 	/**
 	 * @param Gets compiler name
@@ -71,10 +114,10 @@ public:
 	 * @brief Compile a document
 	 *
 	 * @param doc Document to compile
-	 * @param opts Compiler options
-	 * @returns Compiled document as string
+	 * @param stream Stream to output to
+	 * @returns stream
 	 */
-	[[nodiscard]] virtual std::string compile(const Document& doc, const CompilerOptions& opts) const = 0;
+	virtual void compile(const Document& doc) const = 0;
 };
 
 #endif // NML_COMPILER_HPP

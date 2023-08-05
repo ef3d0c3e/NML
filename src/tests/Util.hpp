@@ -49,21 +49,12 @@ namespace
 
 		const std::string& get() const override { return m_current; }
 
-		bool next() override 
+		bool next() override
 		{
 			m_current = randomString(m_mt, m_dist(m_mt));
 			return true;
 		}
 	};
-	//
-	// This helper function provides a nicer UX when instantiating the generator
-	// Notice that it returns an instance of GeneratorWrapper<int>, which
-	// is a value-wrapper around std::unique_ptr<IGenerator<int>>.
-	Catch::Generators::GeneratorWrapper<std::string> random(std::size_t lo, std::size_t hi) {
-		return Catch::Generators::GeneratorWrapper<std::string>(
-				new StringGenerator(lo, hi)
-				);
-	}
 }
 
 

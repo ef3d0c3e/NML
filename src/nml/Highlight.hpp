@@ -78,7 +78,7 @@ template <HighlightTarget Target>
 			std::array<char, 1024> buf;
 			while (true)
 			{
-				std::size_t n = read(rp[0], buf.data(), buf.size());
+				const auto n = read(rp[0], buf.data(), buf.size());
 				if (n == 0)
 					break;
 				else if (n < 0) [[unlikely]]

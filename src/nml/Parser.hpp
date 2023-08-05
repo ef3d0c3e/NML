@@ -173,6 +173,13 @@ public:
 	 * @returns Document containing parsed file
 	 */
 	[[nodiscard]] std::pair<Document, ParserData> parse(const File& f, const Document* inheritDoc = nullptr, ParserData* inheritData = nullptr);
+
+	/**
+	 * @brief Gets the compiler for this parser
+	 *
+	 * @returns The compiler
+	 */
+	[[nodiscard]] const Compiler& getCompiler() const noexcept { return *compiler; }
 };
 
 #endif // NML_PARSER_HPP

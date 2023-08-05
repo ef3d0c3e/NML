@@ -90,9 +90,15 @@ int main(int argc, char* argv[])
 		std::exit(EXIT_FAILURE);
 	}
 
-	const std::filesystem::path in_file_path{in_file};
+	const std::filesystem::path out_file_path{std::filesystem::current_path() / out_file};
+	const std::filesystem::path in_file_path{std::filesystem::current_path() / in_file};
 	if (in_file_path.has_parent_path())
 		std::filesystem::current_path(in_file_path.parent_path());
+	else
+	{
+		std::cerr << "Unable to set working directory" << std::endl;
+		std::exit(EXIT_FAILURE);
+	}
 	
 	// Parse
 	try
@@ -110,31 +116,56 @@ int main(int argc, char* argv[])
 
 
 		Benchmarker.push("Fetching compiler");
+
+		// Get options
+		std::unique_ptr<std::ostream> stream;
+		if (result.count("output"))
+		{
+			stream = std::unique_ptr<std::ostream>(new std::ofstream(out_file_path, std::ios::binary));
+			if (!stream->good())
+			{
+				std::cerr << "Unable to open output file: " << out_file_path << std::endl;
+				std::exit(EXIT_FAILURE);
+			}
+		}
+		else
+			stream = std::make_unique<std::ostream>(std::cout.rdbuf());
+		CompilerOptions opts(*stream);
+
+		const bool noTexDir = !result.count("no-tex") && (!std::filesystem::exists(tex_dir) || !std::filesystem::is_directory(tex_dir));
+		const bool noCacheDir = result.count("no-cache") || (!std::filesystem::exists(cache_dir) || !std::filesystem::is_directory(cache_dir));
+		if (result.count("cxx") && noCacheDir) [[unlikely]]
+		{
+			if (result.count("no-cache"))
+				std::cerr << "Cache must be enabled for CXX processing, see `--help` for more information" << std::endl;
+			else
+				std::cerr << "Cache directory must be set to an existing directory for CXX processing, see `--help` for more information" << std::endl;
+			std::exit(EXIT_FAILURE);
+		}
+
+		// Print warning if caching is set but no dir is found
+		// TODO: Do the same thing for latex
+		if (!result.count("no-cache") && noCacheDir)
+			std::cout << "Warning: Caching is enabled but no cache dir is set!\nYou can disable caching by running with `--no-cache`" << std::endl;
+		
+		opts.tex_enabled = !noTexDir;
+		opts.tex_dir = tex_dir;
+		opts.cache_enabled = !noCacheDir;
+		opts.cache_dir = noCacheDir ? "" : cache_dir;
+		opts.cxx_enabled = result.count("cxx") != 0;
+
+		// Get compiler
 		Compiler* c;
 		if (compiler == "text")
-			c = new TextCompiler();
+			c = new TextCompiler(std::move(opts));
 		else if (compiler == "html")
-			c = new HTMLCompiler();
+			c = new HTMLCompiler(std::move(opts));
 		else
 		{
 			std::cerr << "Unknown compiler: '" << compiler << "'." << std::endl;
 			std::exit(EXIT_FAILURE);
 		}
 		
-		const bool noTexDir = !result.count("no-tex") && (!std::filesystem::exists(tex_dir) || !std::filesystem::is_directory(tex_dir));
-		const bool noCacheDir = !result.count("no-cache") && (!std::filesystem::exists(cache_dir) || !std::filesystem::is_directory(cache_dir));
-		if (result.count("cxx") && noCacheDir) [[unlikely]]
-		{
-			std::cerr << "Cache must be enabled for CXX processing, see --help for more information" << std::endl;
-			std::exit(EXIT_FAILURE);
-		}
-		CompilerOptions opts = {
-			.tex_enabled = !noTexDir,
-			.tex_dir = tex_dir,
-			.cache_enabled = !noCacheDir,
-			.cache_dir = cache_dir,
-			.cxx_enabled = result.count("cxx") != 0,
-		};
 		Benchmarker.pop(); // Fetching compiler
 
 
@@ -143,24 +174,10 @@ int main(int argc, char* argv[])
 		auto doc = p.parse(File(in_file_path.filename().string(), content, 0, 0)).first;
 		Benchmarker.pop(); // Parsing
 
-		if (!result.count("output"))
-		{
-			Benchmarker.push("Compiling");
-			std::cout << c->compile(doc, opts);
-			Benchmarker.pop(); // Compiling
-		}
-		else
-		{
-			std::ofstream out(out_file);
-			if (!out.good())
-			{
-				std::cerr << "Unable to open output file" << std::endl;
-				std::exit(EXIT_FAILURE);
-			}
-			const std::string res = c->compile(doc, opts);
-			out.write(res.data(), res.size());
-			out.close();
-		}
+		Benchmarker.push("Compiling");
+		c->compile(doc);
+		delete c;
+		Benchmarker.pop(); // Compiling
 
 		Benchmarker.push("Printing");
 		for (const std::string& arg : printing)

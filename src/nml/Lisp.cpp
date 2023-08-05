@@ -26,26 +26,12 @@
 #include <ranges>
 #include "LispIntegration.hpp"
 
-struct Lisp::Closure
-{
-	Document& doc;
-	const File& file;
-	ParserData& data;
-};
-
-static void* init(void* data)
-{
-	return nullptr;
-}
-
 template <class T>
 void deleteFn(void* ptr) { delete reinterpret_cast<T>(ptr); }
 
-void Lisp::init(Document& doc, const File& f, ParserData& data, Parser& parser)
+void Lisp::init()
 {
-	Closure* cls = new Closure(doc, f, data);
-	scm_with_guile(::init, cls);
-	scm_c_define("nml-closure", scm_from_pointer(cls, +[](void* p) { std::cout << "called" << std::endl; delete reinterpret_cast<Closure*>(p); }));
+	scm_with_guile(+[]([[maybe_unused]] void*) -> void* { return nullptr; }, NULL);
 
 	scm_c_define_gsubr("nml-var-defined", 1, 1, 0, (void*)+[](SCM name, SCM sdoc)
 	{
@@ -146,17 +132,22 @@ void Lisp::init(Document& doc, const File& f, ParserData& data, Parser& parser)
 
 		return scm_from_pointer(doc, deleteFn<decltype(doc)>);
 	});
-	scm_c_define_gsubr("nml-doc-compile", 2, 1, 0, (void*)+[](SCM sdoc, SCM compiler_name, SCM tex) //TODO: cxx
+	scm_c_define_gsubr("nml-doc-compile", 2, 0, 0, (void*)+[](SCM sdoc, SCM compiler_name) //TODO: cxx
 	{
 		if (scm_is_null(sdoc) || !scm_is_string(compiler_name))
 			return SCM_EOL;
 		const std::string compiler = to_string(compiler_name);
 
+		// Get compiler options
+		const Parser& parser = *reinterpret_cast<const Parser*>(scm_to_pointer(scm_variable_ref(scm_c_lookup("nml-current-parser"))));
+		std::stringstream stream;
+		CompilerOptions opts{parser.getCompiler().getOptions(), stream};
+
 		Compiler* c;
 		if (compiler == "text")
-			c = new TextCompiler();
+			c = new TextCompiler(std::move(opts));
 		else if (compiler == "html")
-			c = new HTMLCompiler();
+			c = new HTMLCompiler(std::move(opts));
 		else
 		{
 			std::cerr << "Unknown compiler: '" << compiler << "'." << std::endl;
@@ -164,28 +155,13 @@ void Lisp::init(Document& doc, const File& f, ParserData& data, Parser& parser)
 		}
 		Document& doc = *reinterpret_cast<Document*>(scm_to_pointer(sdoc));
 
-		CompilerOptions opts;
-		opts.tex_dir = "tex";
-		if (scm_is_eq(tex, SCM_UNDEFINED) || scm_is_null(tex))
-		{
-			opts.tex_enabled = false;
-		}
-		else if (!scm_is_string(tex))
-		{
-			delete c;
-			return SCM_EOL;
-		}
-		else
-		{
-			opts.tex_enabled = true;
-			opts.tex_dir = to_string(tex);
-		}
 
-		const std::string content = c->compile(doc, opts);
+		c->compile(doc);
 
 		delete c;
 
-		return scm_from_locale_stringn(content.data(), content.size());
+		const auto view = stream.view();
+		return scm_from_locale_stringn(view.data(), view.size());
 	});
 
 	scm_c_define_gsubr("nml-num-roman", 2, 0, 0, (void*)+[](SCM number, SCM roman)
@@ -229,7 +205,7 @@ void Lisp::init(Document& doc, const File& f, ParserData& data, Parser& parser)
 		if (scm_is_null(string) || !scm_is_string(string))
 			return SCM_EOL;
 
-		return to_scm(HTMLCompiler::format(to_string(string)));
+		return to_scm(HTMLCompiler::formatHTML(to_string(string)));
 	});
 	// }}}
 

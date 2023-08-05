@@ -22,13 +22,16 @@
 class HTMLCompiler : public Compiler
 {
 public:
+	HTMLCompiler(CompilerOptions&& opts):
+		Compiler(std::move(opts)) {}
+
 	[[nodiscard]] virtual std::string get_name() const;
 	[[nodiscard]] virtual bool var_reserved(const std::string& name) const;
 	[[nodiscard]] virtual std::string var_check(const std::string& name, const std::string& value) const;
-	[[nodiscard]] virtual std::string compile(const Document& doc, const CompilerOptions& opts) const;
+	virtual void compile(const Document& doc) const;
 
 	[[nodiscard]] static std::string get_anchor(const std::string_view& name);
-	[[nodiscard]] static std::string format(const std::string_view& s);
+	[[nodiscard]] static std::string formatHTML(const std::string_view& s);
 };
 
 #endif // NML_HTMLCOMPILER_HPP

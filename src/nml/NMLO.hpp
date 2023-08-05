@@ -233,6 +233,7 @@ class NMLO<Type, Name, NMLOField<Ts, Ns, As>...> : public Syntax::Element
 	template <class T>
 		requires std::is_base_of_v<Syntax::Element, T>
 	friend struct Lisp::TypeConverter;
+	friend class Cache;
 
 	using base = NMLO<Type, Name, NMLOField<Ts, Ns, As>...>;
 	static constexpr inline auto type_index = Type;

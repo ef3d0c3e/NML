@@ -57,7 +57,7 @@ std::string Error::what() const throw()
 }
 
 static std::set<std::string> tex_render_cache; // Already rendered files
-[[nodiscard]] std::pair<std::string, std::string> Tex(const Document& doc, const std::string_view& path, const Syntax::Latex& tex)
+[[nodiscard]] std::pair<std::string, std::string> Tex(const std::string_view& path, const Syntax::Latex& tex)
 {
 	if (!std::filesystem::exists(path)) [[unlikely]]
 		throw Error(fmt::format("Unable to render LaTeX : Directory '{}' could not be found", path));

@@ -30,6 +30,7 @@ class Document;
 struct File;
 struct ParserData;
 struct Parser;
+struct CompilerOptions;
 
 namespace Lisp
 {
@@ -192,7 +193,7 @@ struct TypeBuilder<T, TypeField<FNames, FTypes>...>
 
 struct Closure;
 
-void init(Document& doc, const File& f, ParserData& data, Parser& parser);
+void init();
 void eval(const std::string& s, Document& doc, ParserData& data, Parser& parser);
 std::string eval_r(const std::string& s, Document& doc, ParserData& data, Parser& parser);
 

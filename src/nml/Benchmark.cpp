@@ -23,7 +23,7 @@ Benchmark Benchmarker{};
 
 [[nodiscard]] BenchDur BenchmarkResult::getSubDuration() const
 {
-	BenchDur dur;
+	BenchDur dur{};
 	for (const auto& bench : m_sub)
 		dur += bench.m_dur;
 
@@ -48,7 +48,7 @@ Benchmark Benchmarker{};
 		{
 			append(fmt::format(" * {} [{}]:\n", bench.m_name, bench.m_dur));
 
-			BenchDur subTime;
+			BenchDur subTime{};
 			for (const auto& res : bench.m_sub)
 			{
 				subTime += res.m_dur;

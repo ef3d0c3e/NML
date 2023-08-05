@@ -138,10 +138,9 @@ void ParserData::emplace_after(const std::string_view& regex, Match&& m)
  * @brief Closes any open list(s)
  *
  * @param doc Document
- * @param f File
  * @param data Parser data
  */
-static void closeList(Document& doc, const File& f, ParserData& data)
+static void closeList(Document& doc, ParserData& data)
 {
 	while (!data.list.empty())
 	{
@@ -160,7 +159,7 @@ static void closeList(Document& doc, const File& f, ParserData& data)
  *
  * @returns Constructed text
  */
-static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, const std::string_view& text)
+static Syntax::Text* addText(Document& doc, ParserData& data, const std::string_view& text)
 {
 	std::string append;
 	append.reserve(text.size());
@@ -175,7 +174,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 			return nullptr;
 	}
 
-	closeList(doc, f, data);
+	closeList(doc, data);
 
 	if (doc.empty() || doc.back()->get_type() != Syntax::TEXT) // Create new Text elemeent
 		doc.emplace_back<Syntax::Text>(append);
@@ -203,12 +202,12 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 {
 	if (match_pos == 0 || f.content[match_pos-1] != '\\') // Not escaped
 	{
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 		return {false, match_pos};
 	}
 
-	std::size_t escape_len = 0;
-	while (match_pos-1-escape_len >= 0)
+	std::make_signed_t<std::size_t> escape_len = 0;
+	while (static_cast<std::make_signed_t<std::size_t>>(match_pos)-1-escape_len >= 0)
 	{
 		if (f.content[match_pos-1-escape_len] == '\\')
 			++escape_len;
@@ -218,7 +217,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 
 	if (escape_len % 2) // Escaped
 	{
-		if (auto ptr = addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos - escape_len/2 - 1)); ptr)
+		if (auto ptr = addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos - escape_len/2 - 1)); ptr)
 		{
 			//if (ptr->style == data.style)
 				ptr->get<"content">().append(insert);
@@ -226,13 +225,13 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 				//addText(doc, f, data, insert);
 		}
 		else
-			addText(doc, f, data, insert);
+			addText(doc, data, insert);
 
 		return {true, match_pos+insert.size()};
 	}
 	else // Not escaped
 	{
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos - escape_len/2));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos - escape_len/2));
 
 		return {false, match_pos};
 	}
@@ -406,7 +405,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	matches.emplace_back("(^|\n)( |\t){1,}(\\*|\\-)"s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos) -> std::size_t
 	{
 		Benchmarker.setName("List");
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 		if (f.content[match_pos] == '\n')
 			++match_pos;
 
@@ -603,7 +602,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 		if (f.content[match_pos] == '\n')
 			++match_pos;
 
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 
 		const std::string_view line = f.get_line(match_pos);
 
@@ -651,7 +650,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	matches.emplace_back("(^|\n)[=]{3,}"s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)
 			-> std::size_t
 	{
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 		if (f.content[match_pos] == '\n')
 			++match_pos;
 
@@ -667,7 +666,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	matches.emplace_back("(^|\n)!\\["s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)
 			-> std::size_t
 	{
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 		if (f.content[match_pos] == '\n')
 			++match_pos;
 		
@@ -843,7 +842,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 			-> std::size_t
 	{
 		Benchmarker.setName("Variable definition");
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 		if (f.content[match_pos] == '\n')
 			++match_pos;
 
@@ -974,7 +973,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	matches.emplace_back("(^|\n)#\\:Inc "s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)
 			-> std::size_t
 	{
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 		if (f.content[match_pos] == '\n')
 			++match_pos;
 
@@ -1009,15 +1008,17 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 
 			data.matches.insert(data.matches.begin()+i, pdata.matches[i]);
 		}
-		inc.custom_styles_for_each([&](const std::string& name, const CustomStyle* style)
+		// TODO inc.custom_type_for_each(custom_type&, const CustomType* type, std::string_view before)
+		inc.custom_styles_for_each([&]([[maybe_unused]] const std::string& name, [[maybe_unused]] const CustomStyle* style)
 		{
+			// FIXME why no -1 ?
 			const auto it = std::find_if(data.matches.cbegin(), data.matches.cend(), [&](const Match& m) { return m.original == "="; }); // Before "="
 			data.match_point.insert(data.match_point.cbegin() + std::distance(data.matches.cbegin(), it), 0);
 			data.match_length.insert(data.match_length.cbegin() + std::distance(data.matches.cbegin(), it), 0);
 			data.match_str.insert(data.match_str.cbegin() + std::distance(data.matches.cbegin(), it), "");
 			data.customStyle.push_back(false);
 		});
-		inc.custom_pres_for_each([&](const std::string& name, const CustomPres* pres)
+		inc.custom_pres_for_each([&]([[maybe_unused]] const std::string& name, [[maybe_unused]] const CustomPres* pres)
 		{
 			const auto it = std::find_if(data.matches.cbegin(), data.matches.cend(), [&](const Match& m) { return m.original == "\\[\\[\\|"; }) - 1; // Before "[[["
 			data.match_point.insert(data.match_point.cbegin() + std::distance(data.matches.cbegin(), it), 0);
@@ -1025,7 +1026,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 			data.match_str.insert(data.match_str.cbegin() + std::distance(data.matches.cbegin(), it), "");
 			data.customPres.push_back(0);
 		});
-		inc.custom_process_for_each([&](const std::string& name, const CustomProcess* process)
+		inc.custom_process_for_each([&]([[maybe_unused]] const std::string& name, [[maybe_unused]] const CustomProcess* process)
 		{
 			const auto it = std::find_if(data.matches.cbegin(), data.matches.cend(), [&](const Match& m) { return m.original == "%"; }) - 1; // Before "%"
 			data.match_point.insert(data.match_point.cbegin() + std::distance(data.matches.cbegin(), it), 0);
@@ -1042,7 +1043,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	matches.emplace_back("(^|\n)#\\:DefStyle "s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)
 			-> std::size_t
 	{
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 		if (f.content[match_pos] == '\n')
 			++match_pos;
 
@@ -1135,7 +1136,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	matches.emplace_back("(^|\n)#\\:DefPresentation "s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)
 			-> std::size_t
 	{
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 		if (f.content[match_pos] == '\n')
 			++match_pos;
 
@@ -1208,7 +1209,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	matches.emplace_back("(^|\n)#\\:DefProcess "s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)
 			-> std::size_t
 	{
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 		if (f.content[match_pos] == '\n')
 			++match_pos;
 
@@ -1341,7 +1342,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 		return call_end+1;
 	});
 	// cxxabi definition
-	matches.emplace_back("(^|\n)\\@\\@<"s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)
+	matches.emplace_back("(^|\n)\\@\\@<"s, []([[maybe_unused]] Document& doc, const File& f, [[maybe_unused]] ParserData& data, [[maybe_unused]] std::size_t prev_pos, std::size_t match_pos)
 			-> std::size_t
 	{
 		const std::string_view line = f.get_line(match_pos);
@@ -1422,11 +1423,11 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	});
 	//}}}
 	//{{{ Blocks
-	// Code
+	// Code fragments
 	matches.emplace_back("(^|\n)```"s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)
 			-> std::size_t
 	{
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 		if (f.content[match_pos] == '\n')
 			++match_pos;
 
@@ -1634,7 +1635,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	matches.emplace_back("(^|\n)>"s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)
 			-> std::size_t
 	{
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 		if (f.content[match_pos] == '\n')
 			++match_pos;
 
@@ -1895,7 +1896,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	matches.emplace_back("[\n]{2,}[^#]"s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)
 			-> std::size_t
 	{
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 
 		// In case some style was not closed
 		forEveryStyle(data.style, [&] (Syntax::Style s) {
@@ -1916,35 +1917,17 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 
 		doc.emplace_back<Syntax::Break>(num-1);
 
-		return match_pos+num;
+		return match_pos+num-1;
 	});
 	// Short break
 	matches.emplace_back("\n[^\n]"s, [](Document& doc, const File& f, ParserData& data, std::size_t prev_pos, std::size_t match_pos)
 			-> std::size_t
 	{
-		addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos));
+		addText(doc, data, f.content.substr(prev_pos, match_pos-prev_pos));
 
-		doc.emplace_back<Syntax::Break>(0); // Append size 0 break
-		//// Append a whitespace if previous and current element are text-like
-		//if (doc.empty()) [[unlikely]]
-		//	return match_pos+1;
-		//else if (doc.back()->get_type())
-		//{
-		//	auto& elem = *reinterpret_cast<Syntax::Text*>(doc.back());
-		//	if (elem.style == data.style)
-		//		elem.content.append(append);
-		//	else
-		//		doc.emplace_back<Syntax::Text>(append, data.style);
-		//}
-		//else
-		//{
-		//	doc.emplace_back<Syntax::Text>(append, data.style);
-		//}
-		
-		//if (auto ptr = addText(doc, f, data, f.content.substr(prev_pos, match_pos-prev_pos)); ptr)
-		//{
-		//	addText(doc, f, data, " ");
-		//}
+		if (const auto* elem = doc.empty() ? nullptr : doc.back();
+				elem == nullptr || elem->get_type() != Syntax::BREAK)
+			doc.emplace_back<Syntax::Break>(0); // Append size 0 break
 
 		// In case some style was not closed
 		forEveryStyle(data.style, [&] (Syntax::Style s) {
@@ -2023,7 +2006,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 	if (!lisp)
 	{
 		Benchmarker.push("Initialize lisp");
-		Lisp::init(doc, f, data, *this);
+		Lisp::init();
 		lisp = true;
 		Benchmarker.pop(); // Initialize lisp
 	}
@@ -2034,10 +2017,11 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 		const std::size_t match_index = std::min_element(data.match_point.cbegin(), data.match_point.cend()) - data.match_point.cbegin();
 		const std::size_t match_pos = data.match_point[match_index];
 
+
 		if (match_pos == std::string::npos) // Last match, everything left can only be text
 		{
-			closeList(doc, f, data);
-			addText(doc, f, data, f.content.substr(cur_pos, f.content.size() - cur_pos - 1));
+			closeList(doc, data);
+			addText(doc, data, f.content.substr(cur_pos, f.content.size() - cur_pos - 1));
 
 			// In case some style was not closed
 			forEveryStyle(data.style, [&] (Syntax::Style s) {
@@ -2056,7 +2040,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 
 		// Close lists if not index 0 (index for list)
 		if (match_index != 0)
-			closeList(doc, f, data);
+			closeList(doc, data);
 
 		data.current_match_length = data.match_length[match_index];
 		data.current_match_str = data.match_str[match_index];
@@ -2090,7 +2074,7 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 		Benchmarker.pop(); // Next match
 	}
 
-	closeList(doc, f, data);
+	closeList(doc, data);
 
 	auto isTextLike = [](Syntax::Type t)
 	{
@@ -2132,11 +2116,15 @@ static Syntax::Text* addText(Document& doc, const File& f, ParserData& data, con
 		// add a whitespace before the break
 		if (e1->get_type() == Syntax::TEXT)
 		{
+			// Add directly
 			auto& text = *reinterpret_cast<Syntax::Text*>(e1);
 			text.get<"content">().push_back(' ');
 		}
 		else
-			doc.tree.insert_before<Syntax::Text>(e2, " "s);
+		{
+			if (e1->get_type() != Syntax::BREAK || ((Syntax::Break*)e1)->get<"size">() == 0)
+				doc.tree.insert_before<Syntax::Text>(e2, " "s);
+		}
 		end();
 	});
 

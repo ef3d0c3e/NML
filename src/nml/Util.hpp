@@ -138,12 +138,11 @@ namespace Syntax { struct Latex; }
 /**
  * @brief Generates svg data from Latex element
  *
- * @param doc Document where the Tex element is located
  * @param path Directory to render Tex files in
  * @param tex Tex element to generate LaTeX for
  * @returns <content, filename>
  */
-[[nodiscard]] std::pair<std::string, std::string> Tex(const Document& doc, const std::string_view& path, const Syntax::Latex& tex);
+[[nodiscard]] std::pair<std::string, std::string> Tex(const std::string_view& path, const Syntax::Latex& tex);
 
 template <std::size_t N>
 struct StringLiteral

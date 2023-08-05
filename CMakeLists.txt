@@ -5,8 +5,7 @@ PROJECT(nml
 	HOMEPAGE_URL "https://github.com/ef3d0c3e/NML"
 	LANGUAGES CXX)
 
-SET(CMAKE_CXX_FLAGS "-std=c++2b -Wpedantic -Wall -Og -ggdb")
-SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+SET(CMAKE_CXX_FLAGS "-std=c++2b -Wpedantic -Werror -Wall -Wextra -pedantic -Wall -O3")
 
 FILE(GLOB NML_SOURCES
 	"src/nml/*.cpp"
@@ -26,13 +25,15 @@ ADD_SUBDIRECTORY(libs/cxxopts)
 ADD_SUBDIRECTORY(libs/Catch2)
 ADD_SUBDIRECTORY(libs/utfcpp)
 
-INCLUDE_DIRECTORIES(libs/cxxopts)
+INCLUDE_DIRECTORIES(libs/cxxopts/include)
 INCLUDE_DIRECTORIES(libs/utfcpp/sources)
 
 SET(NML_LIBRARIES fmt PkgConfig::GUILE)
 
 # Build
 ADD_EXECUTABLE(${CMAKE_PROJECT_NAME} src/NML.cpp ${NML_SOURCES})
+TARGET_COMPILE_OPTIONS(${CMAKE_PROJECT_NAME} PRIVATE -ggdb -Og -fno-omit-frame-pointer)
+TARGET_LINK_OPTIONS(${CMAKE_PROJECT_NAME} PRIVATE)
 TARGET_LINK_LIBRARIES(${CMAKE_PROJECT_NAME} fmt PkgConfig::GUILE)
 
 # Test

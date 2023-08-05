@@ -36,13 +36,14 @@ int main(int argc, char* argv[])
 
 	std::string tex_dir, cache_dir, in_file, out_file, compiler;
 	std::vector<std::string> printing;
+	bool cache;
 	opts.add_options()
 		("h,help",    "Displays help", cxxopts::value<bool>()->default_value("false"))
 		("v,version", "Displays version", cxxopts::value<bool>()->default_value("false"))
 		("t,tex-directory", "Sets tex output directory", cxxopts::value<std::string>(tex_dir)->default_value("tex"))
 		("no-tex", "Disables tex processing", cxxopts::value<bool>()->default_value("false"))
 		("cache-dir", "Sets the cache directory", cxxopts::value<std::string>(cache_dir)->default_value("cache"))
-		("no-cache", "Disables caching", cxxopts::value<bool>()->default_value("false"))
+		("cache", "Enables caching", cxxopts::value<bool>(cache)->default_value("false"))
 		("cxx", "Enables cxxabi processing (Requires cache)", cxxopts::value<bool>()->default_value("false"))
 		("i,input", "Sets input file", cxxopts::value<std::string>(in_file))
 		("o,output", "Sets output file", cxxopts::value<std::string>(out_file))
@@ -72,14 +73,22 @@ int main(int argc, char* argv[])
 
 	if (result.count("version"))
 	{
-		std::cout << "NML v0.30\n"
-			<< "License: GNU Affero General Public License version 3 (AGPLv3)\n"
+		std::cout << "NML v0.32\n"
+			<< "License: GNU Affero General Public License version 3 or later (AGPLv3+)\n"
 			<< "see <https://www.gnu.org/licenses/agpl-3.0.en.html>\n"
 			<< "This is free software: you are free to change and redistribute it.\n"
 			<< "There is NO WARRANTY, to the extent permitted by law.\n"
 			<< "\n"
 			<< "Author(s):\n"
-			<< " - ef3d0c3e <ef3d0c3e@pundalik.org>\n";
+			<< " - ef3d0c3e <ef3d0c3e@pundalik.org>\n"
+			<< "\n"
+			<< "Third party libraries license:\n"
+			<< " - guile: https://www.gnu.org/software/guile/manual/html_node/Guile-License.html"
+			<< " - fmt https://github.com/fmtlib/fmt/blob/master/LICENSE.rst\n"
+			<< " - cxxopts: https://github.com/jarro2783/cxxopts/blob/master/LICENSE\n"
+			<< "Libraries for nml-test:\n"
+			<< " - Catch2: https://github.com/catchorg/Catch2/blob/devel/LICENSE.txt\n"
+			<< " - utfcpp: https://github.com/nemtrif/utfcpp/blob/master/LICENSE\n";
 
 		std::exit(EXIT_SUCCESS);
 	}
@@ -133,10 +142,10 @@ int main(int argc, char* argv[])
 		CompilerOptions opts(*stream);
 
 		const bool noTexDir = !result.count("no-tex") && (!std::filesystem::exists(tex_dir) || !std::filesystem::is_directory(tex_dir));
-		const bool noCacheDir = result.count("no-cache") || (!std::filesystem::exists(cache_dir) || !std::filesystem::is_directory(cache_dir));
+		const bool noCacheDir = !cache || (!std::filesystem::exists(cache_dir) || !std::filesystem::is_directory(cache_dir));
 		if (result.count("cxx") && noCacheDir) [[unlikely]]
 		{
-			if (result.count("no-cache"))
+			if (!cache)
 				std::cerr << "Cache must be enabled for CXX processing, see `--help` for more information" << std::endl;
 			else
 				std::cerr << "Cache directory must be set to an existing directory for CXX processing, see `--help` for more information" << std::endl;
@@ -145,8 +154,8 @@ int main(int argc, char* argv[])
 
 		// Print warning if caching is set but no dir is found
 		// TODO: Do the same thing for latex
-		if (!result.count("no-cache") && noCacheDir)
-			std::cout << "Warning: Caching is enabled but no cache dir is set!\nYou can disable caching by running with `--no-cache`" << std::endl;
+		if (cache && noCacheDir)
+			std::cout << "Warning: Caching is enabled but no cache dir is set!\nYou can set the caching directory caching by running with `--cache-dir=PATH`" << std::endl;
 		
 		opts.tex_enabled = !noTexDir;
 		opts.tex_dir = tex_dir;
